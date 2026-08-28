@@ -1,0 +1,9 @@
+Options -Indexes
+RewriteEngine On
+
+# Autoriser les fichiers et dossiers existants
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Tout rediriger vers index.php
+RewriteRule ^(.*)$ index.php [QSA,L]

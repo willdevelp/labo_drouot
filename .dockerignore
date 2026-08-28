@@ -1,0 +1,7 @@
+.git
+.gitignore
+*.md
+.DS_Store
+Thumbs.db
+node_modules
+public/uploads

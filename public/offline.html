@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hors ligne — Laboratoire Drouot</title>
+<style>
+    :root {
+        --blue-primary:  #1E88E5;
+        --blue-dark:     #0D47A1;
+        --bg-app:        #F4F6F9;
+        --text-dark:     #1a2340;
+        --text-muted:    #6b7a99;
+        --border:        #dde3f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-app);
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--text-dark);
+        padding: 24px;
+    }
+    .card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        max-width: 420px;
+        width: 100%;
+        padding: 40px 32px;
+        text-align: center;
+        box-shadow: 0 4px 24px rgba(13, 71, 161, 0.08);
+    }
+    .icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 20px;
+        border-radius: 16px;
+        background: var(--blue-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .icon svg { width: 32px; height: 32px; }
+    h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+        font-weight: 600;
+    }
+    p {
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.6;
+        margin: 0 0 24px;
+    }
+    button {
+        background: var(--blue-primary);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s;
+    }
+    button:hover { background: var(--blue-dark); }
+    .hint {
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+</style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M2 17L12 22L22 17" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M2 12L12 17L22 12" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h1>Cette page n'est pas disponible hors ligne</h1>
+        <p>
+            Tu n'as pas encore consulté cette page pendant que tu étais connecté,
+            elle ne peut donc pas s'afficher sans réseau. Reconnecte-toi et
+            réessaie, ou reviens à une page déjà visitée.
+        </p>
+        <button onclick="location.reload()">Réessayer</button>
+        <div class="hint" id="status"></div>
+    </div>
+    <script>
+        function updateStatus() {
+            document.getElementById('status').textContent =
+                navigator.onLine ? 'Connexion détectée — tu peux réessayer.' : 'Toujours hors ligne.';
+        }
+        window.addEventListener('online', updateStatus);
+        window.addEventListener('offline', updateStatus);
+        updateStatus();
+    </script>
+</body>
+</html>
