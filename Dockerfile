@@ -1,9 +1,3 @@
-# ============================================================
-# Laboratoire Drouot
-# PHP 8.3 + Apache
-# Railway / Render
-# ============================================================
-
 FROM php:8.3-apache
 
 # ============================================================
@@ -23,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 
 # ============================================================
-# 2. Configuration GD
+# 2. GD
 # ============================================================
 
 RUN docker-php-ext-configure gd \
@@ -47,16 +41,25 @@ RUN docker-php-ext-install -j$(nproc) \
 
 
 # ============================================================
-# 4. Apache
+# 4. Apache : UN SEUL MPM
 # ============================================================
 
-# Désactiver tous les MPM existants
-RUN a2dismod mpm_event mpm_worker mpm_prefork || true
+RUN find /etc/apache2/mods-enabled \
+        -type l \
+        -name 'mpm_*' \
+        -delete \
+    && find /etc/apache2/mods-enabled \
+        -type f \
+        -name 'mpm_*' \
+        -delete
 
-# Activer uniquement prefork
-RUN a2enmod mpm_prefork rewrite
+RUN ln -sf /etc/apache2/mods-available/mpm_prefork.load \
+        /etc/apache2/mods-enabled/mpm_prefork.load \
+    && ln -sf /etc/apache2/mods-available/mpm_prefork.conf \
+        /etc/apache2/mods-enabled/mpm_prefork.conf
 
-# ServerName pour éviter le warning Apache
+RUN a2enmod rewrite
+
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
@@ -66,12 +69,11 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 RUN sed -ri \
     's!/var/www/html!/var/www/html/public!g' \
-    /etc/apache2/sites-available/000-default.conf \
-    /etc/apache2/sites-available/default-ssl.conf 2>/dev/null || true
+    /etc/apache2/sites-available/000-default.conf
 
 
 # ============================================================
-# 6. Autoriser .htaccess
+# 6. .htaccess
 # ============================================================
 
 RUN sed -ri \
@@ -80,7 +82,16 @@ RUN sed -ri \
 
 
 # ============================================================
-# 7. Application
+# 7. Vérification Apache
+# ============================================================
+
+RUN echo "===== MPM CONFIGURATION =====" \
+    && apache2ctl -M 2>&1 | grep mpm \
+    && echo "============================="
+
+
+# ============================================================
+# 8. Application
 # ============================================================
 
 WORKDIR /var/www/html
@@ -89,7 +100,7 @@ COPY . /var/www/html
 
 
 # ============================================================
-# 8. Dossiers uploads
+# 9. Uploads
 # ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \
@@ -98,7 +109,7 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# 9. Entrypoint Railway
+# 10. Entrypoint
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -107,7 +118,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 
 # ============================================================
-# 10. Port
+# 11. Port
 # ============================================================
 
 EXPOSE 8080
