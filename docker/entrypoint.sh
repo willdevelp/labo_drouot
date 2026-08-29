@@ -6,6 +6,10 @@
 # au moment du build, car $PORT n'existe pas encore à ce moment-là.
 set -e
 
+# Fix MPM : S'assurer qu'un seul MPM est chargé (prefork est requis par PHP)
+a2dismod mpm_event mpm_worker 2>/dev/null || true
+a2enmod mpm_prefork 2>/dev/null || true
+
 PORT="${PORT:-8080}"
 
 sed -ri "s/^Listen .*/Listen ${PORT}/" /etc/apache2/ports.conf
