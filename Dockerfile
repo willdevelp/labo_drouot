@@ -1,5 +1,9 @@
 FROM php:8.3-apache
 
+# ============================================================
+# DEPENDANCES
+# ============================================================
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libpng-dev \
@@ -11,9 +15,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+
+# ============================================================
+# GD
+# ============================================================
+
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg
+
+
+# ============================================================
+# PHP
+# ============================================================
 
 RUN docker-php-ext-install -j"$(nproc)" \
     pdo \
@@ -27,21 +41,8 @@ RUN docker-php-ext-install -j"$(nproc)" \
 
 
 # ============================================================
-# APACHE MPM
+# APACHE
 # ============================================================
-
-RUN rm -f /etc/apache2/mods-enabled/mpm_event.load \
-          /etc/apache2/mods-enabled/mpm_event.conf \
-          /etc/apache2/mods-enabled/mpm_worker.load \
-          /etc/apache2/mods-enabled/mpm_worker.conf \
-          /etc/apache2/mods-enabled/mpm_prefork.load \
-          /etc/apache2/mods-enabled/mpm_prefork.conf
-
-RUN ln -s /etc/apache2/mods-available/mpm_prefork.load \
-    /etc/apache2/mods-enabled/mpm_prefork.load
-
-RUN ln -s /etc/apache2/mods-available/mpm_prefork.conf \
-    /etc/apache2/mods-enabled/mpm_prefork.conf
 
 RUN a2enmod rewrite
 
@@ -55,6 +56,11 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 RUN sed -ri \
     's!/var/www/html!/var/www/html/public!g' \
     /etc/apache2/sites-available/000-default.conf
+
+
+# ============================================================
+# HTACCESS
+# ============================================================
 
 RUN sed -ri \
     's/AllowOverride None/AllowOverride All/g' \
@@ -80,11 +86,11 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# VERIFICATION BUILD
+# VERIFICATION
 # ============================================================
 
-RUN echo "===== MPM =====" \
-    && ls -la /etc/apache2/mods-enabled/ | grep mpm
+RUN echo "===== APACHE MPM =====" \
+    && apache2ctl -M 2>&1 | grep mpm || true
 
 RUN apache2ctl -t
 
@@ -99,4 +105,4 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 8080
 
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

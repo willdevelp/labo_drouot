@@ -2,16 +2,18 @@
 
 set -e
 
-PORT="${PORT:-8080}"
-
 echo "======================================"
 echo "Laboratoire Drouot"
-echo "Starting Apache on port ${PORT}"
+echo "Custom entrypoint started"
 echo "======================================"
+
+PORT="${PORT:-8080}"
+
+echo "Railway PORT = ${PORT}"
 
 
 # ============================================================
-# PORT RAILWAY
+# PORT APACHE
 # ============================================================
 
 echo "Configuring Apache port..."
@@ -25,25 +27,10 @@ sed -ri \
 
 
 # ============================================================
-# UPLOADS
-# ============================================================
-
-echo "Configuring uploads..."
-
-mkdir -p /var/www/html/public/uploads/patients
-
-chown -R www-data:www-data \
-    /var/www/html/public/uploads 2>/dev/null || true
-
-chmod -R 775 \
-    /var/www/html/public/uploads 2>/dev/null || true
-
-
-# ============================================================
 # MPM
 # ============================================================
 
-echo "Cleaning Apache MPM configuration..."
+echo "Cleaning MPM..."
 
 rm -f /etc/apache2/mods-enabled/mpm_event.load
 rm -f /etc/apache2/mods-enabled/mpm_event.conf
@@ -52,15 +39,44 @@ rm -f /etc/apache2/mods-enabled/mpm_worker.load
 rm -f /etc/apache2/mods-enabled/mpm_worker.conf
 
 
-echo "===== MPM ====="
+echo "===== ACTIVE MPM ====="
 
-ls -la /etc/apache2/mods-enabled/ | grep mpm || true
+find /etc/apache2/mods-enabled \
+    -maxdepth 1 \
+    -name 'mpm_*' \
+    -print
 
-echo "================"
+echo "======================"
 
 
 # ============================================================
-# DÉMARRAGE
+# UPLOADS
+# ============================================================
+
+echo "Configuring uploads..."
+
+mkdir -p /var/www/html/public/uploads/patients
+
+chown -R www-data:www-data \
+    /var/www/html/public/uploads || true
+
+chmod -R 775 \
+    /var/www/html/public/uploads || true
+
+
+# ============================================================
+# TEST APACHE
+# ============================================================
+
+echo "Testing Apache configuration..."
+
+apache2ctl -t
+
+echo "Apache configuration OK"
+
+
+# ============================================================
+# START
 # ============================================================
 
 echo "Starting Apache..."
