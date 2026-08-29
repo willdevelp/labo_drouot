@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
         libicu-dev \
+        libonig-dev \
+        libxml2-dev \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -64,10 +66,10 @@ RUN mkdir -p public/uploads/patients \
     && chown -R www-data:www-data /var/www/html \
     && find /var/www/html/public/uploads -type d -exec chmod 775 {} \;
 
-# ── Port dynamique fourni par Render ────────────────────────
-# Render assigne le port d'écoute via la variable d'environnement $PORT
-# (pas fixe), donc on l'applique à Apache au démarrage du conteneur,
-# pas au moment du build.
+# ── Port dynamique fourni par la plateforme (Railway, Render, ...) ──
+# Ces plateformes assignent le port d'écoute via la variable d'environnement
+# $PORT (jamais fixe), donc on l'applique à Apache au démarrage du
+# conteneur, pas au moment du build.
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
