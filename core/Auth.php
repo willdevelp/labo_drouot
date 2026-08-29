@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Auth.php — Gestion authentification & sessions
