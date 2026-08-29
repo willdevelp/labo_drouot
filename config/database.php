@@ -8,9 +8,13 @@
  * En local (WAMP/XAMPP sans variables d'environnement définies), les
  * valeurs par défaut ci-dessous s'appliquent automatiquement.
  */
-function env(string $key, string $default): string {
+function env(string $key, string $default = ''): string
+{
     $value = getenv($key);
-    return ($value !== false && $value !== '') ? $value : $default;
+
+    return ($value !== false && $value !== '')
+        ? $value
+        : $default;
 }
 
 define('DB_HOST', env('DB_HOST'));
