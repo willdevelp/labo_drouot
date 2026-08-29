@@ -9,6 +9,7 @@ echo "Laboratoire Drouot"
 echo "Starting Apache on port ${PORT}"
 echo "======================================"
 
+
 # ============================================================
 # PORT RAILWAY
 # ============================================================
@@ -32,14 +33,27 @@ echo "Configuring uploads..."
 mkdir -p /var/www/html/public/uploads/patients
 
 chown -R www-data:www-data \
-    /var/www/html/public/uploads || true
+    /var/www/html/public/uploads 2>/dev/null || true
 
 chmod -R 775 \
-    /var/www/html/public/uploads || true
+    /var/www/html/public/uploads 2>/dev/null || true
 
 
 # ============================================================
-# MPM
+# IMPORTANT : SUPPRESSION DU MPM EVENT
+# ============================================================
+
+echo "Cleaning Apache MPM configuration..."
+
+rm -f /etc/apache2/mods-enabled/mpm_event.load
+rm -f /etc/apache2/mods-enabled/mpm_event.conf
+
+rm -f /etc/apache2/mods-enabled/mpm_worker.load
+rm -f /etc/apache2/mods-enabled/mpm_worker.conf
+
+
+# ============================================================
+# VÉRIFICATION
 # ============================================================
 
 echo "===== MPM ====="
@@ -50,7 +64,7 @@ echo "================"
 
 
 # ============================================================
-# TEST CONFIGURATION APACHE
+# TEST APACHE
 # ============================================================
 
 echo "Testing Apache configuration..."
