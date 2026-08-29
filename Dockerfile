@@ -1,62 +1,61 @@
 FROM php:8.3-apache
 
 # ============================================================
-# 1. Dépendances système
+# PHP extensions
 # ============================================================
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libzip-dev \
-        libpng-dev \
-        libjpeg62-turbo-dev \
-        libfreetype6-dev \
-        libicu-dev \
-        libxml2-dev \
-        libonig-dev \
-        unzip \
+    libzip-dev \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libicu-dev \
+    libxml2-dev \
+    libonig-dev \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-
-# ============================================================
-# 2. GD
-# ============================================================
-
 RUN docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg
+    --with-freetype \
+    --with-jpeg
+
+RUN docker-php-ext-install -j"$(nproc)" \
+    pdo \
+    pdo_mysql \
+    mysqli \
+    gd \
+    zip \
+    mbstring \
+    xml \
+    intl
 
 
 # ============================================================
-# 3. Extensions PHP
+# NETTOYAGE COMPLET DE LA CONFIGURATION MPM
 # ============================================================
 
-RUN docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mysqli \
-        gd \
-        zip \
-        mbstring \
-        xml \
-        intl
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
+          /etc/apache2/mods-enabled/mpm_*.conf
+
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.* \
+          /etc/apache2/mods-enabled/mpm_worker.* \
+          /etc/apache2/mods-enabled/mpm_prefork.*
 
 
 # ============================================================
-# 4. Apache : UN SEUL MPM
+# ACTIVER UNIQUEMENT PREFORK
 # ============================================================
 
-RUN find /etc/apache2/mods-enabled \
-        -type l \
-        -name 'mpm_*' \
-        -delete \
-    && find /etc/apache2/mods-enabled \
-        -type f \
-        -name 'mpm_*' \
-        -delete
+RUN ln -s /etc/apache2/mods-available/mpm_prefork.load \
+    /etc/apache2/mods-enabled/mpm_prefork.load
 
-RUN ln -sf /etc/apache2/mods-available/mpm_prefork.load \
-        /etc/apache2/mods-enabled/mpm_prefork.load \
-    && ln -sf /etc/apache2/mods-available/mpm_prefork.conf \
-        /etc/apache2/mods-enabled/mpm_prefork.conf
+RUN ln -s /etc/apache2/mods-available/mpm_prefork.conf \
+    /etc/apache2/mods-enabled/mpm_prefork.conf
+
+
+# ============================================================
+# Apache modules
+# ============================================================
 
 RUN a2enmod rewrite
 
@@ -64,7 +63,7 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
 # ============================================================
-# 5. DocumentRoot = /var/www/html/public
+# DOCUMENT ROOT
 # ============================================================
 
 RUN sed -ri \
@@ -73,7 +72,7 @@ RUN sed -ri \
 
 
 # ============================================================
-# 6. .htaccess
+# HTACCESS
 # ============================================================
 
 RUN sed -ri \
@@ -82,25 +81,16 @@ RUN sed -ri \
 
 
 # ============================================================
-# 7. Vérification Apache
-# ============================================================
-
-RUN echo "===== MPM CONFIGURATION =====" \
-    && apache2ctl -M 2>&1 | grep mpm \
-    && echo "============================="
-
-
-# ============================================================
-# 8. Application
+# APPLICATION
 # ============================================================
 
 WORKDIR /var/www/html
 
-COPY . /var/www/html
+COPY . .
 
 
 # ============================================================
-# 9. Uploads
+# UPLOADS
 # ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \
@@ -109,17 +99,22 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# 10. Entrypoint
+# VERIFICATION MPM
+# ============================================================
+
+RUN echo "===== APACHE MPM =====" \
+    && grep -R "LoadModule mpm_" /etc/apache2 \
+    && echo "======================"
+
+
+# ============================================================
+# ENTRYPOINT
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-
-# ============================================================
-# 11. Port
-# ============================================================
 
 EXPOSE 8080
 
