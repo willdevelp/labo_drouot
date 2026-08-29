@@ -48,10 +48,13 @@ RUN docker-php-ext-install -j$(nproc) \
 
 
 # ============================================================
-# 4. Apache
+# 4. Configuration Apache & Modules
 # ============================================================
 
-RUN a2enmod rewrite
+# Suppression des warnings de ServerName et fixation des modules MPM
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf \
+    && a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite
 
 
 # ============================================================
