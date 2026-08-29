@@ -6,7 +6,6 @@
 
 FROM php:8.3-apache
 
-
 # ============================================================
 # 1. Dépendances système
 # ============================================================
@@ -48,22 +47,27 @@ RUN docker-php-ext-install -j$(nproc) \
 
 
 # ============================================================
-# 4. Configuration Apache & Modules
+# 4. Apache
 # ============================================================
 
-# Suppression stricte des doublons MPM et fixation propre sur prefork
-RUN rm -f /etc/apache2/mods-enabled/mpm_* \
-    && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
-    && a2enmod mpm_prefork rewrite
+# Désactiver tous les MPM existants
+RUN a2dismod mpm_event mpm_worker mpm_prefork || true
+
+# Activer uniquement prefork
+RUN a2enmod mpm_prefork rewrite
+
+# ServerName pour éviter le warning Apache
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
 # ============================================================
-# 5. DocumentRoot = /public
+# 5. DocumentRoot = /var/www/html/public
 # ============================================================
 
 RUN sed -ri \
     's!/var/www/html!/var/www/html/public!g' \
-    /etc/apache2/sites-available/*.conf
+    /etc/apache2/sites-available/000-default.conf \
+    /etc/apache2/sites-available/default-ssl.conf 2>/dev/null || true
 
 
 # ============================================================
@@ -85,7 +89,7 @@ COPY . /var/www/html
 
 
 # ============================================================
-# 8. Dossier uploads
+# 8. Dossiers uploads
 # ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \

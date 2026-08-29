@@ -1,14 +1,25 @@
 #!/bin/sh
+
 set -e
 
-# Attribution dynamique du port fourni par le PaaS via $PORT
 PORT="${PORT:-8080}"
 
-sed -ri "s/^Listen .*/Listen ${PORT}/" /etc/apache2/ports.conf
-sed -ri "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" \
-    /etc/apache2/sites-available/*.conf
+echo "Starting Apache on port ${PORT}"
 
-# Permissions sur le dossier d'uploads
-chown -R www-data:www-data /var/www/html/public/uploads 2>/dev/null || true
+# Configuration du port Apache
+sed -ri "s/^Listen .*/Listen ${PORT}/" /etc/apache2/ports.conf
+
+sed -ri \
+    "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" \
+    /etc/apache2/sites-available/000-default.conf
+
+# Permissions uploads
+mkdir -p /var/www/html/public/uploads/patients
+
+chown -R www-data:www-data \
+    /var/www/html/public/uploads 2>/dev/null || true
+
+chmod -R 775 \
+    /var/www/html/public/uploads 2>/dev/null || true
 
 exec "$@"
