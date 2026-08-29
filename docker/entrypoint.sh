@@ -22,4 +22,15 @@ chown -R www-data:www-data \
 chmod -R 775 \
     /var/www/html/public/uploads 2>/dev/null || true
 
+echo "===== MPM FILES ====="
+find /etc/apache2 -type f -o -type l | grep mpm || true
+
+echo "===== LOADMODULE ====="
+grep -R "LoadModule mpm_" /etc/apache2 2>/dev/null || true
+
+echo "===== APACHE MODULES ====="
+apache2ctl -M 2>&1 || true
+
+echo "======================"
+
 exec "$@"
