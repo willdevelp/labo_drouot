@@ -1,17 +1,19 @@
+```dockerfile
 # syntax=docker/dockerfile:1
 
-# ─────────────────────────────────────────────────────────────
-# Laboratoire Drouot — image Docker (Railway, Render, ou tout PaaS
-# supportant le déploiement par Dockerfile)
-# ─────────────────────────────────────────────────────────────
-# PHP 8.3 + Apache (mod_php). Le dossier /public devient le DocumentRoot
-# directement (pas de dossier /public/ visible dans les URLs, pas besoin
-# du .htaccess racine qui gère ça en local sur WAMP/XAMPP).
+# ============================================================
+# Laboratoire Drouot
+# PHP 8.3 + Apache
+# Railway / Render / PaaS
+# ============================================================
+
 FROM php:8.3-apache
 
-# ── Dépendances système ────────────────────────────────────
-# Nécessaires aux extensions PHP utilisées par PhpSpreadsheet (import
-# Excel des assurés) et par le rendu d'images (GD).
+
+# ============================================================
+# 1. Dépendances système
+# ============================================================
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libpng-dev \
@@ -23,15 +25,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Extensions PHP ──────────────────────────────────────────
-# Compilation volontairement séquentielle (pas de -j$(nproc)) : sur une
-# machine de build à ressources limitées, compiler plusieurs extensions
-# C lourdes en parallèle peut saturer la mémoire et faire échouer une
-# extension au hasard avec un message d'erreur peu clair.
-# Scindé en deux RUN : si l'une des étapes échoue, l'autre reste en
-# cache Docker et n'a pas besoin d'être recompilée au prochain essai.
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
+
+# ============================================================
+# 2. Configuration GD
+# ============================================================
+
+RUN docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg
+
+
+# ============================================================
+# 3. Extensions PHP principales
+# ============================================================
+
+RUN docker-php-ext-install \
         pdo \
         pdo_mysql \
         mysqli \
@@ -39,60 +47,91 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         zip \
         mbstring
 
-RUN docker-php-ext-install \
-        xml \
-        simplexml \
-        dom \
-        xmlreader \
-        xmlwriter \
-        intl
-        pdo \
-        pdo_mysql \
-        mysqli \
-        gd \
-        zip \
-        mbstring \
-        xml \
-        simplexml \
-        dom \
-        xmlreader \
-        xmlwriter \
-        intl
 
-# ── Apache ───────────────────────────────────────────────────
-# mod_rewrite pour le .htaccess de /public (routage vers index.php),
-# AllowOverride All pour que ce .htaccess soit effectivement pris en
-# compte, et DocumentRoot pointé directement sur /public.
-RUN a2enmod rewrite \
-    && sed -ri -e 's!/var/www/html!/var/www/html/public!g' \
-        /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's/AllowOverride None/AllowOverride All/g' \
-        /etc/apache2/apache2.conf
+# ============================================================
+# 4. Extensions XML
+# Installation séquentielle pour éviter les problèmes de
+# dépendances pendant le build Railway
+# ============================================================
+
+RUN docker-php-ext-install dom
+
+RUN docker-php-ext-install simplexml
+
+RUN docker-php-ext-install xml
+
+RUN docker-php-ext-install xmlreader
+
+RUN docker-php-ext-install xmlwriter
+
+
+# ============================================================
+# 5. Internationalisation
+# ============================================================
+
+RUN docker-php-ext-install intl
+
+
+# ============================================================
+# 6. Apache
+# ============================================================
+
+RUN a2enmod rewrite
+
+
+# ============================================================
+# 7. DocumentRoot = /public
+# ============================================================
+
+RUN sed -ri \
+    -e 's!/var/www/html!/var/www/html/public!g' \
+    /etc/apache2/sites-available/*.conf
+
+
+# Autoriser les fichiers .htaccess
+
+RUN sed -ri \
+    -e 's/AllowOverride None/AllowOverride All/g' \
+    /etc/apache2/apache2.conf
+
+
+# ============================================================
+# 8. Application
+# ============================================================
 
 WORKDIR /var/www/html
+
 COPY . /var/www/html
 
-# ── Dossier d'upload (photos patients) ──────────────────────
-# ATTENTION : le disque du conteneur est éphémère par défaut sur la
-# plupart des PaaS — tout fichier écrit ici est perdu au prochain
-# déploiement ou redémarrage du service. Pour conserver les photos :
-#   - Railway : attacher un Volume (Settings → Volumes) monté sur
-#     /var/www/html/public/uploads. Note : Railway monte les volumes en
-#     tant que root, donc il peut être nécessaire d'ajuster les
-#     permissions au démarrage (voir docker/entrypoint.sh) si www-data
-#     n'arrive pas à y écrire une fois le volume attaché.
-#   - Render : Persistent Disk (Dashboard → ton service → Disks).
-RUN mkdir -p public/uploads/patients \
-    && chown -R www-data:www-data /var/www/html \
-    && find /var/www/html/public/uploads -type d -exec chmod 775 {} \;
 
-# ── Port dynamique fourni par la plateforme (Railway, Render, ...) ──
-# Ces plateformes assignent le port d'écoute via la variable d'environnement
-# $PORT (jamais fixe), donc on l'applique à Apache au démarrage du
-# conteneur, pas au moment du build.
+# ============================================================
+# 9. Dossiers d'upload
+# ============================================================
+
+RUN mkdir -p \
+        /var/www/html/public/uploads/patients \
+    && chown -R www-data:www-data /var/www/html \
+    && find /var/www/html/public/uploads \
+        -type d \
+        -exec chmod 775 {} \;
+
+
+# ============================================================
+# 10. Entrypoint
+# ============================================================
+
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+
+# ============================================================
+# 11. Port Railway
+# ============================================================
+
 EXPOSE 8080
+
 ENTRYPOINT ["entrypoint.sh"]
+
 CMD ["apache2-foreground"]
+```
