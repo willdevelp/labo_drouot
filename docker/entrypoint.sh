@@ -9,9 +9,40 @@ echo "Laboratoire Drouot"
 echo "Starting Apache on port ${PORT}"
 echo "======================================"
 
+# ============================================================
+# IMPORTANT :
+# PHP 8.3 avec mod_php utilise prefork.
+# On supprime physiquement les liens event/worker
+# juste avant le lancement d'Apache.
+# ============================================================
+
+rm -f /etc/apache2/mods-enabled/mpm_event.load
+rm -f /etc/apache2/mods-enabled/mpm_event.conf
+
+rm -f /etc/apache2/mods-enabled/mpm_worker.load
+rm -f /etc/apache2/mods-enabled/mpm_worker.conf
+
 
 # ============================================================
-# Configuration du port Railway
+# Vérification MPM
+# ============================================================
+
+echo "===== MPM FINAL ====="
+
+find /etc/apache2/mods-enabled \
+    -name 'mpm_*' \
+    -print
+
+echo "===== LOADMODULE FINAL ====="
+
+grep -R "^LoadModule mpm_" \
+    /etc/apache2/mods-enabled 2>/dev/null || true
+
+echo "======================"
+
+
+# ============================================================
+# Port Railway
 # ============================================================
 
 sed -ri "s/^Listen .*/Listen ${PORT}/" \
@@ -36,25 +67,9 @@ chmod -R 775 \
 
 
 # ============================================================
-# Vérification
-# ============================================================
-
-echo "===== MPM FINAL ====="
-
-find /etc/apache2/mods-enabled \
-    -name 'mpm_*' \
-    -print
-
-echo "===== LOADMODULE FINAL ====="
-
-grep -R "^LoadModule mpm_" \
-    /etc/apache2/mods-enabled 2>/dev/null || true
-
-echo "======================"
-
-
-# ============================================================
 # Démarrage
 # ============================================================
+
+echo "Starting Apache..."
 
 exec "$@"
