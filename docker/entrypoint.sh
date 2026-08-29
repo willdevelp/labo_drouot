@@ -40,7 +40,7 @@ chmod -R 775 \
 
 
 # ============================================================
-# IMPORTANT : SUPPRESSION DU MPM EVENT
+# MPM
 # ============================================================
 
 echo "Cleaning Apache MPM configuration..."
@@ -52,10 +52,6 @@ rm -f /etc/apache2/mods-enabled/mpm_worker.load
 rm -f /etc/apache2/mods-enabled/mpm_worker.conf
 
 
-# ============================================================
-# VÉRIFICATION
-# ============================================================
-
 echo "===== MPM ====="
 
 ls -la /etc/apache2/mods-enabled/ | grep mpm || true
@@ -64,20 +60,9 @@ echo "================"
 
 
 # ============================================================
-# TEST APACHE
-# ============================================================
-
-echo "Testing Apache configuration..."
-
-apache2ctl -t
-
-echo "Apache configuration OK"
-
-
-# ============================================================
-# START APACHE
+# DÉMARRAGE
 # ============================================================
 
 echo "Starting Apache..."
 
-exec apache2 -D FOREGROUND
+exec apache2-foreground
