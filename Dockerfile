@@ -1,9 +1,8 @@
 FROM php:8.3-apache
 
 # ============================================================
-# DEPENDANCES
+# DÉPENDANCES SYSTÈME
 # ============================================================
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libpng-dev \
@@ -15,19 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-
 # ============================================================
-# GD
+# EXTENSIONS PHP
 # ============================================================
-
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg
-
-
-# ============================================================
-# PHP
-# ============================================================
 
 RUN docker-php-ext-install -j"$(nproc)" \
     pdo \
@@ -39,68 +31,29 @@ RUN docker-php-ext-install -j"$(nproc)" \
     xml \
     intl
 
+# ============================================================
+# CONFIGURATION APACHE
+# ============================================================
+RUN a2enmod rewrite \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
+    && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
+    && sed -ri 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # ============================================================
-# APACHE
+# CODE SOURCE ET PERMISSIONS
 # ============================================================
-
-RUN a2enmod rewrite
-
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
-
-
-# ============================================================
-# DOCUMENT ROOT
-# ============================================================
-
-RUN sed -ri \
-    's!/var/www/html!/var/www/html/public!g' \
-    /etc/apache2/sites-available/000-default.conf
-
-
-# ============================================================
-# HTACCESS
-# ============================================================
-
-RUN sed -ri \
-    's/AllowOverride None/AllowOverride All/g' \
-    /etc/apache2/apache2.conf
-
-
-# ============================================================
-# APPLICATION
-# ============================================================
-
 WORKDIR /var/www/html
 
 COPY . .
-
-
-# ============================================================
-# UPLOADS
-# ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/public/uploads
 
-
 # ============================================================
-# VERIFICATION
+# ENTRYPOINT ET PORT
 # ============================================================
-
-RUN echo "===== APACHE MPM =====" \
-    && apache2ctl -M 2>&1 | grep mpm || true
-
-RUN apache2ctl -t
-
-
-# ============================================================
-# ENTRYPOINT
-# ============================================================
-
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 8080
