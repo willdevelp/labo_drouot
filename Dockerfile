@@ -1,5 +1,4 @@
-```dockerfile
-# syntax=docker/dockerfile:1
+
 
 # ============================================================
 # Laboratoire Drouot
