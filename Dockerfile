@@ -41,22 +41,18 @@ RUN docker-php-ext-install -j"$(nproc)" \
 
 
 # ============================================================
-# 4. Apache — MPM
+# 4. Apache
 # ============================================================
 
-# L'image php:apache peut avoir mpm_event activé.
-# PHP avec mod_php nécessite prefork.
-RUN a2dismod mpm_event || true
-RUN a2dismod mpm_worker || true
-RUN a2dismod mpm_prefork || true
+# L'image php:8.3-apache utilise mod_php.
+# On doit donc utiliser prefork.
 
-# Activer uniquement prefork
+RUN a2dismod mpm_event mpm_worker mpm_prefork || true
+
 RUN a2enmod mpm_prefork
 
-# Module rewrite
 RUN a2enmod rewrite
 
-# ServerName
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
@@ -72,7 +68,7 @@ RUN echo "===== MPM ENABLED =====" \
 
 
 # ============================================================
-# 6. DocumentRoot = /public
+# 6. DocumentRoot
 # ============================================================
 
 RUN sed -ri \
@@ -81,7 +77,7 @@ RUN sed -ri \
 
 
 # ============================================================
-# 7. .htaccess
+# 7. Autoriser .htaccess
 # ============================================================
 
 RUN sed -ri \
@@ -108,7 +104,7 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# 10. Entrypoint
+# 10. Entrypoint Railway
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -117,7 +113,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 
 # ============================================================
-# 11. Port Railway
+# 11. Port
 # ============================================================
 
 EXPOSE 8080
