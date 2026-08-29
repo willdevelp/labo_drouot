@@ -13,10 +13,10 @@ function env(string $key, string $default): string {
     return ($value !== false && $value !== '') ? $value : $default;
 }
 
-define('DB_HOST', env('DB_HOST', 'localhost'));
-define('DB_NAME', env('DB_NAME', 'labo_drouot'));
-define('DB_USER', env('DB_USER', 'root'));
-define('DB_PASS', env('DB_PASS', ''));
+define('DB_HOST', env('DB_HOST'));
+define('DB_NAME', env('DB_NAME'));
+define('DB_USER', env('DB_USER'));
+define('DB_PASS', env('DB_PASS'));
 define('DB_CHARSET', 'utf8mb4');
 
 // Informations de l'application
@@ -29,7 +29,7 @@ define('APP_VERSION', '1.0.0');
 // Sur Railway/Render (voir Dockerfile), le DocumentRoot pointe directement
 // sur /public : BASE_URL doit alors être l'URL fournie par la plateforme
 // telle quelle, sans suffixe /public/.
-define('BASE_URL', env('BASE_URL', 'http://localhost/labo_drouot/'));
+define('BASE_URL', env('BASE_URL'));
 
 // Configuration SMTP (envoi d'emails — réinitialisation mot de passe, etc.)
 // À adapter avec tes vrais identifiants une fois le compte email créé.
