@@ -133,4 +133,3 @@ EXPOSE 8080
 ENTRYPOINT ["entrypoint.sh"]
 
 CMD ["apache2-foreground"]
-```
