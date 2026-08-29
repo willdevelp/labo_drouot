@@ -10,40 +10,10 @@ echo "Starting Apache on port ${PORT}"
 echo "======================================"
 
 # ============================================================
-# IMPORTANT :
-# PHP 8.3 avec mod_php utilise prefork.
-# On supprime physiquement les liens event/worker
-# juste avant le lancement d'Apache.
+# PORT RAILWAY
 # ============================================================
 
-rm -f /etc/apache2/mods-enabled/mpm_event.load
-rm -f /etc/apache2/mods-enabled/mpm_event.conf
-
-rm -f /etc/apache2/mods-enabled/mpm_worker.load
-rm -f /etc/apache2/mods-enabled/mpm_worker.conf
-
-
-# ============================================================
-# Vérification MPM
-# ============================================================
-
-echo "===== MPM FINAL ====="
-
-find /etc/apache2/mods-enabled \
-    -name 'mpm_*' \
-    -print
-
-echo "===== LOADMODULE FINAL ====="
-
-grep -R "^LoadModule mpm_" \
-    /etc/apache2/mods-enabled 2>/dev/null || true
-
-echo "======================"
-
-
-# ============================================================
-# Port Railway
-# ============================================================
+echo "Configuring Apache port..."
 
 sed -ri "s/^Listen .*/Listen ${PORT}/" \
     /etc/apache2/ports.conf
@@ -54,22 +24,46 @@ sed -ri \
 
 
 # ============================================================
-# Uploads
+# UPLOADS
 # ============================================================
+
+echo "Configuring uploads..."
 
 mkdir -p /var/www/html/public/uploads/patients
 
 chown -R www-data:www-data \
-    /var/www/html/public/uploads 2>/dev/null || true
+    /var/www/html/public/uploads || true
 
 chmod -R 775 \
-    /var/www/html/public/uploads 2>/dev/null || true
+    /var/www/html/public/uploads || true
 
 
 # ============================================================
-# Démarrage
+# MPM
+# ============================================================
+
+echo "===== MPM ====="
+
+ls -la /etc/apache2/mods-enabled/ | grep mpm || true
+
+echo "================"
+
+
+# ============================================================
+# TEST CONFIGURATION APACHE
+# ============================================================
+
+echo "Testing Apache configuration..."
+
+apache2ctl -t
+
+echo "Apache configuration OK"
+
+
+# ============================================================
+# START APACHE
 # ============================================================
 
 echo "Starting Apache..."
 
-exec "$@"
+exec apache2 -D FOREGROUND

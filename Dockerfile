@@ -1,9 +1,5 @@
 FROM php:8.3-apache
 
-# ============================================================
-# 1. Dépendances système
-# ============================================================
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libpng-dev \
@@ -15,19 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-
-# ============================================================
-# 2. GD
-# ============================================================
-
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg
-
-
-# ============================================================
-# 3. Extensions PHP
-# ============================================================
 
 RUN docker-php-ext-install -j"$(nproc)" \
     pdo \
@@ -41,16 +27,15 @@ RUN docker-php-ext-install -j"$(nproc)" \
 
 
 # ============================================================
-# 4. Apache / MPM
+# APACHE MPM
 # ============================================================
 
-RUN rm -f \
-    /etc/apache2/mods-enabled/mpm_event.load \
-    /etc/apache2/mods-enabled/mpm_event.conf \
-    /etc/apache2/mods-enabled/mpm_worker.load \
-    /etc/apache2/mods-enabled/mpm_worker.conf \
-    /etc/apache2/mods-enabled/mpm_prefork.load \
-    /etc/apache2/mods-enabled/mpm_prefork.conf
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load \
+          /etc/apache2/mods-enabled/mpm_event.conf \
+          /etc/apache2/mods-enabled/mpm_worker.load \
+          /etc/apache2/mods-enabled/mpm_worker.conf \
+          /etc/apache2/mods-enabled/mpm_prefork.load \
+          /etc/apache2/mods-enabled/mpm_prefork.conf
 
 RUN ln -s /etc/apache2/mods-available/mpm_prefork.load \
     /etc/apache2/mods-enabled/mpm_prefork.load
@@ -64,17 +49,12 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
 # ============================================================
-# 5. DocumentRoot
+# DOCUMENT ROOT
 # ============================================================
 
 RUN sed -ri \
     's!/var/www/html!/var/www/html/public!g' \
     /etc/apache2/sites-available/000-default.conf
-
-
-# ============================================================
-# 6. .htaccess
-# ============================================================
 
 RUN sed -ri \
     's/AllowOverride None/AllowOverride All/g' \
@@ -82,7 +62,7 @@ RUN sed -ri \
 
 
 # ============================================================
-# 7. Application
+# APPLICATION
 # ============================================================
 
 WORKDIR /var/www/html
@@ -91,7 +71,7 @@ COPY . .
 
 
 # ============================================================
-# 8. Uploads
+# UPLOADS
 # ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \
@@ -100,20 +80,23 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# 9. Entrypoint
+# VERIFICATION BUILD
+# ============================================================
+
+RUN echo "===== MPM =====" \
+    && ls -la /etc/apache2/mods-enabled/ | grep mpm
+
+RUN apache2ctl -t
+
+
+# ============================================================
+# ENTRYPOINT
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-
-# ============================================================
-# 10. Railway
-# ============================================================
-
 EXPOSE 8080
 
 ENTRYPOINT ["entrypoint.sh"]
-
-CMD ["apache2-foreground"]
