@@ -1,7 +1,7 @@
 FROM php:8.3-apache
 
 # ============================================================
-# PHP extensions
+# 1. Dépendances système
 # ============================================================
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,9 +15,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+
+# ============================================================
+# 2. Configuration GD
+# ============================================================
+
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg
+
+
+# ============================================================
+# 3. Extensions PHP
+# ============================================================
 
 RUN docker-php-ext-install -j"$(nproc)" \
     pdo \
@@ -31,39 +41,40 @@ RUN docker-php-ext-install -j"$(nproc)" \
 
 
 # ============================================================
-# NETTOYAGE COMPLET DE LA CONFIGURATION MPM
+# 4. Apache — MPM
 # ============================================================
 
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
-          /etc/apache2/mods-enabled/mpm_*.conf
+# Désactiver tous les MPM
+RUN a2dismod mpm_event mpm_worker mpm_prefork || true
 
+# Supprimer les liens éventuels
 RUN rm -f /etc/apache2/mods-enabled/mpm_event.* \
           /etc/apache2/mods-enabled/mpm_worker.* \
           /etc/apache2/mods-enabled/mpm_prefork.*
 
+# Activer uniquement prefork
+RUN a2enmod mpm_prefork
 
-# ============================================================
-# ACTIVER UNIQUEMENT PREFORK
-# ============================================================
-
-RUN ln -s /etc/apache2/mods-available/mpm_prefork.load \
-    /etc/apache2/mods-enabled/mpm_prefork.load
-
-RUN ln -s /etc/apache2/mods-available/mpm_prefork.conf \
-    /etc/apache2/mods-enabled/mpm_prefork.conf
-
-
-# ============================================================
-# Apache modules
-# ============================================================
-
+# Module rewrite
 RUN a2enmod rewrite
 
+# ServerName
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 
 # ============================================================
-# DOCUMENT ROOT
+# 5. Vérification MPM
+# ============================================================
+
+RUN echo "===== MPM ENABLED =====" \
+    && find /etc/apache2/mods-enabled -name 'mpm_*' -print \
+    && echo "===== MPM LOADMODULE =====" \
+    && grep -R "^LoadModule mpm_" /etc/apache2/mods-enabled || true \
+    && echo "========================"
+
+
+# ============================================================
+# 6. DocumentRoot = /public
 # ============================================================
 
 RUN sed -ri \
@@ -72,7 +83,7 @@ RUN sed -ri \
 
 
 # ============================================================
-# HTACCESS
+# 7. .htaccess
 # ============================================================
 
 RUN sed -ri \
@@ -81,7 +92,7 @@ RUN sed -ri \
 
 
 # ============================================================
-# APPLICATION
+# 8. Application
 # ============================================================
 
 WORKDIR /var/www/html
@@ -90,7 +101,7 @@ COPY . .
 
 
 # ============================================================
-# UPLOADS
+# 9. Uploads
 # ============================================================
 
 RUN mkdir -p /var/www/html/public/uploads/patients \
@@ -99,22 +110,17 @@ RUN mkdir -p /var/www/html/public/uploads/patients \
 
 
 # ============================================================
-# VERIFICATION MPM
-# ============================================================
-
-RUN echo "===== APACHE MPM =====" \
-    && grep -R "LoadModule mpm_" /etc/apache2 \
-    && echo "======================"
-
-
-# ============================================================
-# ENTRYPOINT
+# 10. Entrypoint
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+
+# ============================================================
+# 11. Port Railway
+# ============================================================
 
 EXPOSE 8080
 

@@ -4,16 +4,27 @@ set -e
 
 PORT="${PORT:-8080}"
 
+echo "======================================"
+echo "Laboratoire Drouot"
 echo "Starting Apache on port ${PORT}"
+echo "======================================"
 
-# Configuration du port Apache
-sed -ri "s/^Listen .*/Listen ${PORT}/" /etc/apache2/ports.conf
+# ============================================================
+# Port Apache
+# ============================================================
+
+sed -ri "s/^Listen .*/Listen ${PORT}/" \
+    /etc/apache2/ports.conf
 
 sed -ri \
     "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" \
     /etc/apache2/sites-available/000-default.conf
 
-# Permissions uploads
+
+# ============================================================
+# Uploads
+# ============================================================
+
 mkdir -p /var/www/html/public/uploads/patients
 
 chown -R www-data:www-data \
@@ -22,15 +33,27 @@ chown -R www-data:www-data \
 chmod -R 775 \
     /var/www/html/public/uploads 2>/dev/null || true
 
-echo "===== MPM FILES ====="
-find /etc/apache2 -type f -o -type l | grep mpm || true
 
-echo "===== LOADMODULE ====="
-grep -R "LoadModule mpm_" /etc/apache2 2>/dev/null || true
+# ============================================================
+# Vérification MPM avant démarrage
+# ============================================================
 
-echo "===== APACHE MODULES ====="
-apache2ctl -M 2>&1 || true
+echo "===== MPM ENABLED ====="
 
-echo "======================"
+find /etc/apache2/mods-enabled \
+    -name 'mpm_*' \
+    -print
+
+echo "===== LOADMODULE MPM ====="
+
+grep -R "^LoadModule mpm_" \
+    /etc/apache2/mods-enabled 2>/dev/null || true
+
+echo "========================"
+
+
+# ============================================================
+# Démarrage Apache
+# ============================================================
 
 exec "$@"
