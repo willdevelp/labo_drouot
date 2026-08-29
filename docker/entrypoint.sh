@@ -10,6 +10,16 @@ echo "Starting Apache on port ${PORT}"
 echo "======================================"
 
 # ============================================================
+# Sécurité : un seul MPM
+# ============================================================
+
+a2dismod mpm_event 2>/dev/null || true
+a2dismod mpm_worker 2>/dev/null || true
+a2dismod mpm_prefork 2>/dev/null || true
+
+a2enmod mpm_prefork
+
+# ============================================================
 # Port Apache
 # ============================================================
 
@@ -19,7 +29,6 @@ sed -ri "s/^Listen .*/Listen ${PORT}/" \
 sed -ri \
     "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" \
     /etc/apache2/sites-available/000-default.conf
-
 
 # ============================================================
 # Uploads
@@ -33,27 +42,21 @@ chown -R www-data:www-data \
 chmod -R 775 \
     /var/www/html/public/uploads 2>/dev/null || true
 
-
 # ============================================================
-# Vérification MPM avant démarrage
+# Vérification
 # ============================================================
 
-echo "===== MPM ENABLED ====="
+echo "===== MPM FINAL ====="
 
 find /etc/apache2/mods-enabled \
     -name 'mpm_*' \
     -print
 
-echo "===== LOADMODULE MPM ====="
+echo "===== LOADMODULE FINAL ====="
 
 grep -R "^LoadModule mpm_" \
     /etc/apache2/mods-enabled 2>/dev/null || true
 
-echo "========================"
-
-
-# ============================================================
-# Démarrage Apache
-# ============================================================
+echo "======================"
 
 exec "$@"

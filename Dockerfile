@@ -44,13 +44,11 @@ RUN docker-php-ext-install -j"$(nproc)" \
 # 4. Apache — MPM
 # ============================================================
 
-# Désactiver tous les MPM
-RUN a2dismod mpm_event mpm_worker mpm_prefork || true
-
-# Supprimer les liens éventuels
-RUN rm -f /etc/apache2/mods-enabled/mpm_event.* \
-          /etc/apache2/mods-enabled/mpm_worker.* \
-          /etc/apache2/mods-enabled/mpm_prefork.*
+# L'image php:apache peut avoir mpm_event activé.
+# PHP avec mod_php nécessite prefork.
+RUN a2dismod mpm_event || true
+RUN a2dismod mpm_worker || true
+RUN a2dismod mpm_prefork || true
 
 # Activer uniquement prefork
 RUN a2enmod mpm_prefork
@@ -68,7 +66,7 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 RUN echo "===== MPM ENABLED =====" \
     && find /etc/apache2/mods-enabled -name 'mpm_*' -print \
-    && echo "===== MPM LOADMODULE =====" \
+    && echo "===== LOADMODULE MPM =====" \
     && grep -R "^LoadModule mpm_" /etc/apache2/mods-enabled || true \
     && echo "========================"
 
