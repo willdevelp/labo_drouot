@@ -1,46 +1,53 @@
 <?php
 /**
  * Configuration base de données — Laboratoire Drouot
- * Connexion PDO avec gestion d'erreurs
- *
- * Toutes les valeurs peuvent être surchargées par des variables
- * d'environnement (utilisé en production sur Render — voir Dockerfile).
- * En local (WAMP/XAMPP sans variables d'environnement définies), les
- * valeurs par défaut ci-dessous s'appliquent automatiquement.
+ * Utilisation prioritaire d'une URL de connexion (DATABASE_URL / DB_URL)
  */
+
 function env(string $key, string $default = ''): string
 {
     $value = getenv($key);
+    if ($value === false || $value === '') {
+        $value = $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+    }
 
-    return ($value !== false && $value !== '')
-        ? $value
-        : $default;
+    return (string) $value;
 }
 
-define('DB_HOST', env('DB_HOST'));
-define('DB_NAME', env('DB_NAME'));
-define('DB_USER', env('DB_USER'));
-define('DB_PASS', env('DB_PASS'));
+// 1. Récupération de l'URL de base de données si elle existe
+$dbUrl = env('DATABASE_URL', env('DB_URL', env('MYSQL_URL')));
+
+if (!empty($dbUrl)) {
+    // Analyse de l'URL de type mysql://user:password@host:port/dbname
+    $urlComponents = parse_url($dbUrl);
+
+    $host = $urlComponents['host'] ?? '127.0.0.1';
+    $port = $urlComponents['port'] ?? 3306;
+    $user = $urlComponents['user'] ?? 'root';
+    $pass = $urlComponents['pass'] ?? '';
+    $name = isset($urlComponents['path']) ? ltrim($urlComponents['path'], '/') : 'labo_drouot';
+} else {
+    // Repli sur les variables individuelles ou valeurs par défaut locales
+    $host = env('MYSQLHOST', env('DB_HOST', '127.0.0.1'));
+    $port = env('MYSQLPORT', env('DB_PORT', '3306'));
+    $user = env('MYSQLUSER', env('DB_USER', 'root'));
+    $pass = env('MYSQLPASSWORD', env('DB_PASS', ''));
+    $name = env('MYSQLDATABASE', env('DB_NAME', 'labo_drouot'));
+}
+
+define('DB_HOST', $host);
+define('DB_PORT', $port);
+define('DB_USER', $user);
+define('DB_PASS', $pass);
+define('DB_NAME', $name);
 define('DB_CHARSET', 'utf8mb4');
 
 // Informations de l'application
 define('APP_NAME', 'Labo Drouot');
 define('APP_VERSION', '1.0.0');
-// Le dossier /public n'apparaît jamais dans les URLs visibles : le
-// .htaccess à la racine du projet réécrit déjà en interne vers
-// public/$1 pour toute requête. Mettre /public/ ici produirait des
-// liens invalides (Apache chercherait public/public/...).
-// Sur Railway/Render (voir Dockerfile), le DocumentRoot pointe directement
-// sur /public : BASE_URL doit alors être l'URL fournie par la plateforme
-// telle quelle, sans suffixe /public/.
-define('BASE_URL', env('BASE_URL'));
+define('BASE_URL', env('BASE_URL', 'http://localhost:8080'));
 
-// Configuration SMTP (envoi d'emails — réinitialisation mot de passe, etc.)
-// À adapter avec tes vrais identifiants une fois le compte email créé.
-// Pour Gmail : activer la validation en 2 étapes puis générer un
-// "mot de passe d'application" dédié (Google Account → Sécurité →
-// Mots de passe des applications) — le mot de passe normal du compte
-// ne fonctionne plus pour l'envoi SMTP.
+// Configuration SMTP
 define('SMTP_HOST', env('SMTP_HOST', 'smtp.gmail.com'));
 define('SMTP_USER', env('SMTP_USER', 'ton-adresse@gmail.com'));
 define('SMTP_PASS', env('SMTP_PASS', 'mot-de-passe-application'));
@@ -54,19 +61,25 @@ class Database {
 
     public static function getConnection(): PDO {
         if (self::$instance === null) {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::ATTR_TIMEOUT            => 5,
             ];
+
             try {
                 self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
             } catch (PDOException $e) {
-                die(json_encode([
+                http_response_code(500);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
                     'success' => false,
                     'message' => 'Erreur de connexion à la base de données : ' . $e->getMessage()
-                ]));
+                ]);
+                exit;
             }
         }
         return self::$instance;

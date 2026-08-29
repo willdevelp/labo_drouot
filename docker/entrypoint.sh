@@ -11,16 +11,15 @@ PORT="${PORT:-8080}"
 echo "Railway PORT = ${PORT}"
 
 # ============================================================
-# CONFIGURATION DU PORT APACHE
+# PORT APACHE
 # ============================================================
 echo "Configuring Apache port..."
 
-sed -ri "s/^Listen .*/Listen ${PORT}/" \
-    /etc/apache2/ports.conf
+# Remplace tout bloc Listen existant
+echo "Listen ${PORT}" > /etc/apache2/ports.conf
 
-sed -ri \
-    "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" \
-    /etc/apache2/sites-available/000-default.conf
+# Remplace le port du VirtualHost 000-default.conf
+sed -ri "s/<VirtualHost [^>]+>/<VirtualHost *:${PORT}>/" /etc/apache2/sites-available/000-default.conf
 
 # ============================================================
 # NETTOYAGE DES MODULES MPM
