@@ -1,9 +1,7 @@
-
-
 # ============================================================
 # Laboratoire Drouot
 # PHP 8.3 + Apache
-# Railway / Render / PaaS
+# Railway / Render
 # ============================================================
 
 FROM php:8.3-apache
@@ -19,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
         libicu-dev \
-        libonig-dev \
         libxml2-dev \
         unzip \
     && rm -rf /var/lib/apt/lists/*
@@ -35,67 +32,47 @@ RUN docker-php-ext-configure gd \
 
 
 # ============================================================
-# 3. Extensions PHP principales
+# 3. Extensions PHP
 # ============================================================
 
-RUN docker-php-ext-install \
+RUN docker-php-ext-install -j1 \
         pdo \
         pdo_mysql \
         mysqli \
         gd \
         zip \
-        mbstring
+        mbstring \
+        xml \
+        intl
 
 
 # ============================================================
-# 4. Extensions XML
-# Installation séquentielle pour éviter les problèmes de
-# dépendances pendant le build Railway
-# ============================================================
-
-RUN docker-php-ext-install dom
-
-RUN docker-php-ext-install simplexml
-
-RUN docker-php-ext-install xml
-
-RUN docker-php-ext-install xmlreader
-
-RUN docker-php-ext-install xmlwriter
-
-
-# ============================================================
-# 5. Internationalisation
-# ============================================================
-
-RUN docker-php-ext-install intl
-
-
-# ============================================================
-# 6. Apache
+# 4. Apache
 # ============================================================
 
 RUN a2enmod rewrite
 
 
 # ============================================================
-# 7. DocumentRoot = /public
+# 5. DocumentRoot = /public
 # ============================================================
 
 RUN sed -ri \
-    -e 's!/var/www/html!/var/www/html/public!g' \
+    's!/var/www/html!/var/www/html/public!g' \
     /etc/apache2/sites-available/*.conf
 
 
-# Autoriser les fichiers .htaccess
+# ============================================================
+# 6. Autoriser .htaccess
+# ============================================================
 
 RUN sed -ri \
-    -e 's/AllowOverride None/AllowOverride All/g' \
+    's/AllowOverride None/AllowOverride All/g' \
     /etc/apache2/apache2.conf
 
 
 # ============================================================
-# 8. Application
+# 7. Application
 # ============================================================
 
 WORKDIR /var/www/html
@@ -104,19 +81,16 @@ COPY . /var/www/html
 
 
 # ============================================================
-# 9. Dossiers d'upload
+# 8. Dossier uploads
 # ============================================================
 
-RUN mkdir -p \
-        /var/www/html/public/uploads/patients \
+RUN mkdir -p /var/www/html/public/uploads/patients \
     && chown -R www-data:www-data /var/www/html \
-    && find /var/www/html/public/uploads \
-        -type d \
-        -exec chmod 775 {} \;
+    && chmod -R 775 /var/www/html/public/uploads
 
 
 # ============================================================
-# 10. Entrypoint
+# 9. Entrypoint Railway
 # ============================================================
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -125,7 +99,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 
 # ============================================================
-# 11. Port Railway
+# 10. Port
 # ============================================================
 
 EXPOSE 8080
