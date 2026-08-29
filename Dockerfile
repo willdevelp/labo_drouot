@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libicu-dev \
         libxml2-dev \
+        libonig-dev \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,7 +36,7 @@ RUN docker-php-ext-configure gd \
 # 3. Extensions PHP
 # ============================================================
 
-RUN docker-php-ext-install -j1 \
+RUN docker-php-ext-install -j$(nproc) \
         pdo \
         pdo_mysql \
         mysqli \
