@@ -427,5 +427,6 @@
             });
         }
     </script>
+    <script src="/assets/js/pwa-install.js" defer></script>
 </body>
 </html>

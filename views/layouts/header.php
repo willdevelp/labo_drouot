@@ -53,6 +53,8 @@ $pageTitle = $pageTitles[$lastSeg] ?? 'Tableau de bord';
 
     <!-- File d'attente hors ligne -->
     <script src="/assets/js/offline-outbox.js"></script>
+    <!-- Popup d'installation PWA -->
+    <script src="/assets/js/pwa-install.js" defer></script>
 
     <style>
         /* ═══════════════════════════════════════════

@@ -45,7 +45,20 @@ define('DB_CHARSET', 'utf8mb4');
 // Informations de l'application
 define('APP_NAME', 'Labo Drouot');
 define('APP_VERSION', '1.0.0');
-define('BASE_URL', env('BASE_URL', 'http://localhost:8080'));
+
+// Tout le code du projet concatène BASE_URL directement devant un chemin
+// (ex: BASE_URL . 'admin/patients') en supposant qu'il se termine par un
+// slash. Comme il est facile d'oublier ce slash en configurant la
+// variable d'environnement sur Railway/Render, on le rajoute ici
+// automatiquement s'il manque — ça évite que TOUS les liens/formulaires
+// de l'app se retrouvent cassés silencieusement (ex:
+// "https://mon-app.up.railway.appadmin/patients" au lieu de
+// ".../admin/patients").
+$baseUrl = env('BASE_URL', 'http://localhost:8080/');
+if (substr($baseUrl, -1) !== '/') {
+    $baseUrl .= '/';
+}
+define('BASE_URL', $baseUrl);
 
 // Configuration SMTP
 define('SMTP_HOST', env('SMTP_HOST', 'smtp.gmail.com'));
