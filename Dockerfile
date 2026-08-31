@@ -46,6 +46,11 @@ WORKDIR /var/www/html
 
 COPY . .
 
+RUN echo "===== PWA FILES =====" && \
+    find /var/www/html/public -type f \
+    \( -name "*.png" -o -name "manifest.json" -o -name "sw.js" \) \
+    -print
+
 RUN mkdir -p /var/www/html/public/uploads/patients \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/public/uploads
