@@ -17,12 +17,16 @@
     const DISMISS_KEY = 'pwaInstallDismissedAt';
     const DISMISS_DAYS = 7;
 
-    // Injecte l'animation d'apparition (le script n'a pas de fichier CSS dédié)
+    // Injecte les animations CSS et les styles nécessaires
     const style = document.createElement('style');
     style.textContent = `
         @keyframes pwaBannerIn {
             from { opacity: 0; transform: translateY(12px); }
             to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pwaFadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
         }
     `;
     document.head.appendChild(style);
@@ -42,14 +46,51 @@
     function markDismissed() {
         try {
             localStorage.setItem(DISMISS_KEY, String(Date.now()));
-        } catch (err) { /* stockage indisponible, tant pis */ }
+        } catch (err) { /* stockage indisponible */ }
     }
 
     function isIOS() {
         return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
     }
 
-    function buildBanner({ message, primaryLabel, onPrimary, showPrimary }) {
+    // Modal d'instructions spécifique à iOS au clic sur le bouton
+    function showIosInstructionsModal() {
+        const modal = document.createElement('div');
+        modal.id = 'pwa-ios-modal';
+        modal.style.cssText =
+            'position:fixed;top:0;left:0;width:100%;height:100%;' +
+            'background:rgba(0,0,0,0.5);z-index:6000;display:flex;' +
+            'align-items:center;justify-content:center;padding:20px;' +
+            'box-sizing:border-box;animation:pwaFadeIn .2s ease;';
+
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:16px;max-width:360px;width:100%;
+                        padding:20px;font-family:'DM Sans',-apple-system,sans-serif;
+                        box-shadow:0 10px 30px rgba(0,0,0,0.2);position:relative;">
+                <div style="font-weight:700;font-size:1rem;color:#1a2340;margin-bottom:12px;text-align:center;">
+                    Installer sur iOS Safari
+                </div>
+                <ol style="font-size:.85rem;color:#4a5568;line-height:1.6;padding-left:20px;margin:0 0 16px 0;">
+                    <li style="margin-bottom:8px;">Appuyez sur le bouton <strong>Partager</strong> <i class="fas fa-share-from-square" style="color:#1E88E5;"></i> dans la barre Safari.</li>
+                    <li style="margin-bottom:8px;">Faites défiler le menu vers le bas.</li>
+                    <li>Sélectionnez <strong>« Sur l'écran d'accueil »</strong> <i class="fas fa-plus-square" style="color:#1E88E5;"></i>.</li>
+                </ol>
+                <button id="pwa-ios-modal-close" style="width:100%;background:#1E88E5;color:#fff;
+                        border:none;border-radius:8px;padding:10px;font-size:.85rem;
+                        font-weight:600;cursor:pointer;">
+                    J'ai compris
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('pwa-ios-modal-close').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    function buildBanner({ message, primaryLabel, onPrimary }) {
         const banner = document.createElement('div');
         banner.id = 'pwa-install-banner';
         banner.style.cssText =
@@ -75,13 +116,11 @@
                     ${message}
                 </div>
                 <div style="margin-top:10px;display:flex;gap:8px;">
-                    ${showPrimary ? `
-                        <button id="pwa-install-btn-yes" style="background:#1E88E5;color:#fff;
-                                border:none;border-radius:8px;padding:7px 14px;font-size:.8rem;
-                                font-weight:600;cursor:pointer;font-family:inherit;">
-                            ${primaryLabel}
-                        </button>
-                    ` : ''}
+                    <button id="pwa-install-btn-yes" style="background:#1E88E5;color:#fff;
+                            border:none;border-radius:8px;padding:7px 14px;font-size:.8rem;
+                            font-weight:600;cursor:pointer;font-family:inherit;">
+                        ${primaryLabel}
+                    </button>
                     <button id="pwa-install-btn-no" style="background:transparent;color:#6b7a99;
                             border:none;padding:7px 10px;font-size:.8rem;cursor:pointer;
                             font-family:inherit;">
@@ -103,12 +142,9 @@
             banner.remove();
         };
 
-        if (showPrimary) {
-            document.getElementById('pwa-install-btn-yes').addEventListener('click', () => {
-                banner.remove();
-                onPrimary();
-            });
-        }
+        document.getElementById('pwa-install-btn-yes').addEventListener('click', () => {
+            onPrimary(close);
+        });
         document.getElementById('pwa-install-btn-no').addEventListener('click', close);
         document.getElementById('pwa-install-btn-close').addEventListener('click', close);
     }
@@ -117,6 +153,7 @@
 
     let deferredPrompt = null;
 
+    // Chrome / Android / Windows / Mac
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -124,10 +161,13 @@
         buildBanner({
             message: 'Ajoute l\'application à ton écran d\'accueil pour y accéder plus vite, même hors ligne.',
             primaryLabel: 'Installer',
-            showPrimary: true,
-            onPrimary: async () => {
+            onPrimary: async (closeBanner) => {
+                if (!deferredPrompt) return;
                 deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
+                const choice = await deferredPrompt.userChoice;
+                if (choice.outcome === 'accepted') {
+                    closeBanner();
+                }
                 deferredPrompt = null;
             },
         });
@@ -139,15 +179,17 @@
         markDismissed();
     });
 
-    // iOS Safari : pas d'événement beforeinstallprompt, on affiche une
-    // instruction manuelle à la place (après un court délai, pour ne pas
-    // asséner ça dès la première seconde de visite).
+    // iOS Safari
     if (isIOS() && !window.navigator.standalone) {
         setTimeout(() => {
             if (document.getElementById('pwa-install-banner')) return;
             buildBanner({
-                message: 'Appuie sur le bouton Partager de Safari, puis "Sur l\'écran d\'accueil".',
-                showPrimary: false,
+                message: 'Ajoute l\'application sur ton écran d\'accueil pour une expérience optimale.',
+                primaryLabel: 'Voir comment faire',
+                onPrimary: (closeBanner) => {
+                    closeBanner();
+                    showIosInstructionsModal();
+                },
             });
         }, 4000);
     }
