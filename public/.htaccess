@@ -1,9 +1,11 @@
 Options -Indexes
+
 RewriteEngine On
 
-# Autoriser accès aux fichiers et dossiers réels
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Ne jamais envoyer les fichiers physiques vers index.php
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# Tout passer à index.php
+# Toutes les routes de l'application vers index.php
 RewriteRule ^ index.php [QSA,L]

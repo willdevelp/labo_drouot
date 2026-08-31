@@ -1,3 +1,11 @@
 Options -Indexes
+
 RewriteEngine On
+
+# Ne pas réécrire si le fichier/dossier existe réellement à la racine
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Tout le reste vers /public
 RewriteRule ^(.*)$ public/$1 [L]
