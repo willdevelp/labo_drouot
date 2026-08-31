@@ -1,10 +1,11 @@
 /**
  * OfflineOutbox — Laboratoire Drouot
  *
- * File d'attente générique pour les formulaires qui doivent pouvoir être
- * soumis hors ligne. Stocke les requêtes non envoyées dans IndexedDB et
- * les rejoue automatiquement au retour du réseau.
+ * File d'attente générique pour les formulaires hors ligne.
+ * Convertit les fichiers en ArrayBuffer pour garantir la compatibilité
+ * IndexedDB sur tous les navigateurs (notamment Safari / iOS).
  */
+
 const OfflineOutbox = (function () {
     const DB_NAME    = 'labo-drouot-outbox';
     const DB_VERSION = 1;
@@ -30,10 +31,40 @@ const OfflineOutbox = (function () {
         });
     }
 
+    // Convertit un File/Blob en ArrayBuffer pour un stockage IndexedDB sécurisé
+    async function serializeFieldValue(value) {
+        if (value instanceof File || value instanceof Blob) {
+            const buffer = await value.arrayBuffer();
+            return {
+                __isFile: true,
+                name: value.name || 'file',
+                type: value.type || 'application/octet-stream',
+                buffer: buffer
+            };
+        }
+        return value;
+    }
+
+    // Reconstruit une valeur sérialisée en File si nécessaire
+    function deserializeFieldValue(value) {
+        if (value && typeof value === 'object' && value.__isFile) {
+            return new File([value.buffer], value.name, { type: value.type });
+        }
+        return value;
+    }
+
     async function enqueue(entry) {
         const db = await openDB();
         entry.createdAt = Date.now();
         entry.status    = 'pending';
+
+        // Sérialisation des champs (conversion des fichiers)
+        if (Array.isArray(entry.fields)) {
+            entry.fields = await Promise.all(
+                entry.fields.map(async ([k, v]) => [k, await serializeFieldValue(v)])
+            );
+        }
+
         return new Promise((resolve, reject) => {
             const tx  = db.transaction(STORE, 'readwrite');
             const req = tx.objectStore(STORE).add(entry);
@@ -66,14 +97,14 @@ const OfflineOutbox = (function () {
         });
     }
 
-    // Helper pour reconstruire FormData en préservant les objets File/Blob et leurs noms
     function buildFormData(fields) {
         const fd = new FormData();
-        fields.forEach(([k, v, filename]) => {
-            if (filename) {
-                fd.append(k, v, filename);
+        fields.forEach(([k, v]) => {
+            const deserialized = deserializeFieldValue(v);
+            if (deserialized instanceof File) {
+                fd.append(k, deserialized, deserialized.name);
             } else {
-                fd.append(k, v);
+                fd.append(k, deserialized);
             }
         });
         return fd;
@@ -111,18 +142,17 @@ const OfflineOutbox = (function () {
                     const fd  = buildFormData(item.fields);
                     const res = await fetch(item.url, { method: 'POST', body: fd });
                     
-                    // On ne supprime que si la requête a été acceptée par le serveur (statut 2xx)
+                    // Suppression uniquement en cas de statut 2xx
                     if (res.ok) {
                         await remove(item.localId);
                         syncedAny = true;
                         window.dispatchEvent(new CustomEvent('outbox:synced', { detail: item }));
                     } else if (res.status >= 400 && res.status < 500) {
-                        // Erreur client (ex: 422 Unprocessable), conserver ou gérer selon le besoin métier
-                        console.error(`Erreur serveur ${res.status} pour l'élément ${item.localId}`);
+                        console.error(`Erreur client/serveur (${res.status}) pour l'élément ${item.localId}`);
                         break;
                     }
                 } catch (err) {
-                    // Échec réseau : arrêt de la boucle de synchronisation
+                    // Erreur réseau : interruption du cycle de synchro
                     break;
                 }
             }
@@ -160,7 +190,7 @@ const OfflineOutbox = (function () {
             const reg = await navigator.serviceWorker.ready;
             await reg.sync.register('sync-outbox');
         } catch (err) {
-            // Ignorer silencieusement si la fonctionnalité n'est pas supportée
+            // Repli silencieux
         }
     }
 
@@ -204,15 +234,7 @@ const OfflineOutbox = (function () {
 
             const fd = new FormData(form);
             const fields = [];
-            
-            // Extraction structurée pour gérer les fichiers et leurs métadonnées
-            fd.forEach((v, k) => {
-                if (v instanceof File) {
-                    fields.push([k, v, v.name]);
-                } else {
-                    fields.push([k, v]);
-                }
-            });
+            fd.forEach((v, k) => fields.push([k, v]));
 
             const btn = form.querySelector('[type="submit"]');
             const originalHTML = btn ? btn.innerHTML : null;
@@ -225,7 +247,7 @@ const OfflineOutbox = (function () {
                 if (!navigator.onLine) throw new Error('offline');
                 const res = await fetch(form.action, { method: 'POST', body: fd });
                 if (!res.ok) throw new Error('server_error');
-                
+
                 if (opts.redirect) {
                     window.location.href = opts.redirect;
                 } else if (res.redirected) {
