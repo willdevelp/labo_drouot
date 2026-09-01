@@ -7,27 +7,41 @@
  */
 document.addEventListener('DOMContentLoaded', function () {
 
-    // 1. Interception globale de la soumission de formulaires
+    async function softRedirect(url) {
+        if (!url) return;
+        try {
+            const base = url.split('?')[0];
+            const cached = (await caches.match(url)) || (await caches.match(base));
+            if (cached) {
+                window.location.href = url;
+                return;
+            }
+        } catch (_) { /* caches API indisponible */ }
+        // Page non en cache : on reste sur place (évite offline.html)
+    }
+
+    // 1. Interception globale (capture) pour passer avant les handlers des vues
     document.addEventListener('submit', async function (e) {
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
 
         const storeName = form.dataset.offlineStore;
-        if (!storeName) return; // pas marqué offline → comportement natif
+        if (!storeName) return;
 
-        // ── EN LIGNE : on laisse le navigateur faire le POST classique ──
+        // ── EN LIGNE : POST classique ──────────────────────────────────
         if (navigator.onLine) {
             return;
         }
 
-        // ── HORS LIGNE : on intercepte ─────────────────────────────────
+        // ── HORS LIGNE ────────────────────────────────────────────────
         e.preventDefault();
+        e.stopImmediatePropagation();
 
         const deleteId    = form.dataset.offlineDeleteId;
         const entityId    = form.dataset.entityId;
         const toggleField = form.dataset.toggleField;
         const serverUrl   = form.action;
-        const redirectUrl = form.dataset.redirect || window.location.href;
+        const redirectUrl = form.dataset.redirect || '';
         const type        = form.dataset.offlineType || storeName;
 
         try {
@@ -57,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     label: 'Mise à jour ' + storeName + ' #' + entityId
                 });
                 LocalDB.toast('Hors ligne : modification enregistrée localement', 'info');
-                window.location.href = redirectUrl;
+                await softRedirect(redirectUrl);
 
             } else if (entityId && entityId !== '') {
                 await LocalDB.update(storeName, entityId, payload, serverUrl, {
@@ -66,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     label: 'Modification ' + storeName + ' #' + entityId
                 });
                 LocalDB.toast('Hors ligne : modification enregistrée localement', 'info');
-                window.location.href = redirectUrl;
+                await softRedirect(redirectUrl);
 
             } else {
                 await LocalDB.create(storeName, payload, serverUrl, {
@@ -74,22 +88,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     fields,
                     label: 'Création ' + storeName
                 });
-                LocalDB.toast('Hors ligne : création enregistrée localement. Sync au retour du réseau.', 'info');
-                window.location.href = redirectUrl;
+                LocalDB.toast(
+                    'Hors ligne : enregistré localement. Synchronisation au retour du réseau.',
+                    'info'
+                );
+                form.reset();
+                await softRedirect(redirectUrl);
             }
 
         } catch (err) {
             console.error('Erreur traitement offline :', err);
-            LocalDB.toast('Erreur lors de l\'enregistrement local', 'error');
+            LocalDB.toast('Erreur lors de l\'enregistrement local : ' + (err.message || err), 'error');
         }
-    });
+    }, true);
 
     // 2. Interception des boutons de suppression hors formulaire
     document.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-offline-delete]');
         if (!btn) return;
 
-        // En ligne : laisser le comportement natif (lien ou form submit)
         if (navigator.onLine) return;
 
         e.preventDefault();

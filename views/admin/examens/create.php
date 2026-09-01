@@ -251,32 +251,72 @@ function fillExemple(code, nom, cat, prix) {
     document.querySelector('[name="prix"]').value = prix;
 }
 
-// ── Gestion Offline-First du formulaire Examen ────────────────────
+// ── Offline-first : hors ligne → IndexedDB (données utilisables tout de suite)
 const formExamen = document.getElementById('formExamen');
 
 formExamen.addEventListener('submit', async function (e) {
-    e.preventDefault();
+    // En ligne → POST PHP classique
+    if (navigator.onLine) {
+        return;
+    }
 
-    // 1. Récupération des données saisies
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const nom = formExamen.querySelector('[name="nom"]').value.trim();
+    const categorie = (document.getElementById('catInput') || {}).value?.trim()
+        || formExamen.querySelector('[name="categorie"]')?.value?.trim()
+        || '';
+    const prix = parseFloat(formExamen.querySelector('[name="prix"]').value) || 0;
+
+    if (!nom || !categorie || prix <= 0) {
+        alert('Nom, catégorie et prix sont obligatoires.');
+        return;
+    }
+
     const examenData = {
-        code: formExamen.querySelector('[name="code"]').value.trim() || 'EX-' + Date.now(),
-        nom: formExamen.querySelector('[name="nom"]').value.trim(),
-        categorie: document.getElementById('catInput').value.trim(),
-        prix: parseFloat(formExamen.querySelector('[name="prix"]').value) || 0,
-        description: formExamen.querySelector('[name="description"]').value.trim()
+        code: formExamen.querySelector('[name="code"]').value.trim() || '',
+        nom,
+        categorie,
+        prix,
+        description: formExamen.querySelector('[name="description"]')?.value?.trim() || '',
+        is_active: 1,
+        nb_parametres: 0,
+        nb_realises: 0
     };
 
+    const fd = new FormData(formExamen);
+    const fields = [];
+    fd.forEach((v, k) => fields.push([k, v]));
+    const setField = (k, v) => {
+        const i = fields.findIndex(([key]) => key === k);
+        if (i >= 0) fields[i] = [k, String(v)];
+        else fields.push([k, String(v)]);
+    };
+    Object.entries(examenData).forEach(([k, v]) => setField(k, v));
+
     try {
-        // 2. Enregistrement instantané dans la base IndexedDB locale
-        await LocalDB.create('examens', examenData, '<?= BASE_URL ?>admin/examens/store');
+        await LocalDB.create(
+            'examens',
+            examenData,
+            formExamen.action || '<?= BASE_URL ?>admin/examens/store',
+            {
+                type: 'examens',
+                fields,
+                label: 'Nouvel examen — ' + examenData.nom
+            }
+        );
 
-        // 3. Tenter une synchronisation automatique avec PHP en arrière-plan
-        LocalDB.syncAll();
+        LocalDB.toast(
+            'Examen enregistré sur cet appareil. Tu peux continuer à travailler hors ligne.',
+            'success'
+        );
 
-        // 4. Redirection immédiate vers la liste
+        // Retour liste : affichage immédiat depuis IndexedDB
         window.location.href = '<?= BASE_URL ?>admin/examens';
     } catch (err) {
-        console.error('Erreur lors de l\'enregistrement local :', err);
+        console.error(err);
+        alert('Erreur enregistrement local : ' + (err.message || err));
     }
 });
 </script>

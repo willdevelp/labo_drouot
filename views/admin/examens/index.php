@@ -368,9 +368,243 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<div id="pendingExamensBox" style="display:none;"></div>
+<!-- Conteneur client pour rendu offline-first -->
+<div id="offlineExamensRoot"></div>
+
 <script>
-OfflineOutbox.renderPendingWidget('pendingExamensBox', ['examen']);
+/**
+ * Offline-first examens :
+ * - En ligne  : hydrate IndexedDB avec les données serveur, affiche les créations locales en plus
+ * - Hors ligne: la liste affichée vient entièrement d'IndexedDB (travail continu sans réseau)
+ * - Sync auto au retour du réseau
+ */
+(function () {
+    const SERVER_EXAMENS = <?= json_encode(array_map(function ($ex) {
+        return [
+            'id'            => (string)$ex['id'],
+            'code'          => $ex['code'] ?? '',
+            'nom'           => $ex['nom'] ?? '',
+            'categorie'     => $ex['categorie'] ?? 'Autre',
+            'prix'          => (float)($ex['prix'] ?? 0),
+            'description'   => $ex['description'] ?? '',
+            'is_active'     => (int)($ex['is_active'] ?? 1),
+            'nb_parametres' => (int)($ex['nb_parametres'] ?? 0),
+            'nb_realises'   => (int)($ex['nb_realises'] ?? 0),
+            'synced'        => 1,
+        ];
+    }, $examens ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+    const BASE = '<?= rtrim(BASE_URL, "/") ?>/';
+
+    function esc(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatPrix(n) {
+        return Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' F';
+    }
+
+    function isLocalId(id) {
+        return String(id).startsWith('local_');
+    }
+
+    function cardHtml(ex) {
+        const pending = isLocalId(ex.id) || ex.synced === 0;
+        const active = ex.is_active === undefined || Number(ex.is_active) === 1;
+        return `
+        <div class="examen-card ${active ? '' : 'examen-inactive'}" data-id="${esc(ex.id)}">
+            <div class="examen-card-top">
+                <div>
+                    <div class="examen-code">${esc(ex.code || '—')}</div>
+                    <div class="examen-nom">${esc(ex.nom || '')}</div>
+                </div>
+                ${pending
+                    ? '<span class="badge-pending">Local</span>'
+                    : (active ? '<span class="badge-normal">Actif</span>' : '<span class="badge-critical">Inactif</span>')}
+            </div>
+            ${ex.description ? `<div class="examen-desc">${esc(String(ex.description).slice(0, 60))}</div>` : ''}
+            <div class="examen-card-stats">
+                <span class="examen-stat"><i class="fas fa-sliders"></i> ${ex.nb_parametres || 0} param.</span>
+                <span class="examen-stat"><i class="fas fa-chart-bar"></i> ${ex.nb_realises || 0} réalisé(s)</span>
+                <span class="examen-prix">${formatPrix(ex.prix)}</span>
+            </div>
+            <div class="examen-card-actions">
+                ${pending ? `
+                    <span style="font-size:.75rem;color:#F57F17;">
+                        <i class="fas fa-database"></i> Disponible hors ligne — sync auto à la reconnexion
+                    </span>
+                    <button type="button" class="action-btn action-btn-danger" title="Supprimer localement"
+                        data-local-delete="${esc(ex.id)}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                ` : `
+                    <a href="${BASE}admin/examens/${esc(ex.id)}/parametres" class="action-btn action-btn-primary" title="Paramètres">
+                        <i class="fas fa-sliders"></i>
+                    </a>
+                    <a href="${BASE}admin/examens/${esc(ex.id)}/edit" class="action-btn action-btn-edit" title="Modifier">
+                        <i class="fas fa-pen"></i>
+                    </a>
+                `}
+            </div>
+        </div>`;
+    }
+
+    function renderGrouped(list, container) {
+        const grouped = {};
+        list.forEach(ex => {
+            const cat = ex.categorie || 'Autre';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(ex);
+        });
+        const cats = Object.keys(grouped).sort((a, b) => a.localeCompare(b, 'fr'));
+        container.innerHTML = cats.map(cat => `
+            <div class="cat-section mb-3">
+                <div class="cat-section-header">
+                    <div class="cat-section-title">${esc(cat)}
+                        <span class="badge-pending" style="margin-left:8px;">${grouped[cat].length}</span>
+                    </div>
+                </div>
+                <div class="examens-grid">
+                    ${grouped[cat].map(cardHtml).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function hideServerList() {
+        // Masque le rendu PHP serveur pour éviter le double affichage hors ligne
+        document.querySelectorAll('.cat-section, .examens-grid').forEach(el => {
+            if (!el.closest('#offlineExamensRoot')) {
+                // ne masque que les sections serveur (hors notre root)
+            }
+        });
+        // Approche simple : masquer les enfants directs du main hors offline root / alerts / title
+        const main = document.querySelector('main.main-content') || document.querySelector('.main-content');
+        if (!main) return;
+        Array.from(main.children).forEach(child => {
+            if (child.id === 'offlineExamensRoot') return;
+            if (child.id === 'connectivity-banner') return;
+            // garde titre + bouton nouvel examen
+            if (child.querySelector && child.querySelector('.page-title')) return;
+            if (child.classList && child.classList.contains('alert-drouot')) return;
+            // masque filtres + grilles serveur
+            if (child.querySelector('.search-form') || child.classList.contains('cat-section') ||
+                child.querySelector('.examens-grid') || child.querySelector('.cat-section-header') ||
+                child.id === 'localExamensSection') {
+                child.style.display = 'none';
+            }
+            // sections cat
+            if (child.querySelector && child.querySelector('[data-toggle-cat]')) {
+                child.style.display = 'none';
+            }
+        });
+        // Masque aussi toutes les cat-section serveur
+        document.querySelectorAll('main .cat-section, .main-content .cat-section').forEach(el => {
+            if (!el.closest('#offlineExamensRoot')) el.style.display = 'none';
+        });
+        document.querySelectorAll('main .card-drouot').forEach(el => {
+            if (el.querySelector('.search-form') && !el.closest('#offlineExamensRoot')) {
+                // garder les filtres visibles même offline (optionnel)
+            }
+        });
+    }
+
+    async function refresh() {
+        if (typeof LocalDB === 'undefined') return;
+
+        // Toujours hydrater avec les données serveur connues (page en cache)
+        try {
+            if (SERVER_EXAMENS && SERVER_EXAMENS.length) {
+                await LocalDB.seedStore('examens', SERVER_EXAMENS);
+            }
+        } catch (e) {
+            console.warn(e);
+        }
+
+        const all = (await LocalDB.getAll('examens'))
+            .filter(ex => !ex._deleted)
+            .sort((a, b) => String(a.categorie||'').localeCompare(String(b.categorie||''), 'fr')
+                || String(a.nom||'').localeCompare(String(b.nom||''), 'fr'));
+
+        const root = document.getElementById('offlineExamensRoot');
+        if (!root) return;
+
+        const pending = all.filter(ex => isLocalId(ex.id) || ex.synced === 0);
+        const offline = !navigator.onLine;
+
+        if (offline) {
+            // Mode travail hors ligne : liste complète depuis IndexedDB
+            hideServerList();
+            root.innerHTML = `
+                <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                    <strong style="color:#F57F17;">
+                        <i class="fas fa-database me-1"></i> Mode hors ligne
+                    </strong>
+                    — ${all.length} examen(s) sur cet appareil
+                    ${pending.length ? ` · <span style="color:#F57F17;">${pending.length} non synchronisé(s)</span>` : ''}
+                </div>
+                ${all.length === 0
+                    ? `<div class="card-drouot text-center py-4 text-muted">
+                         Aucun examen en local.
+                         <a class="btn-primary-drouot mt-2" href="${BASE}admin/examens/create">
+                           <i class="fas fa-plus"></i> Créer un examen
+                         </a>
+                       </div>`
+                    : '<div id="offlineGrouped"></div>'}
+            `;
+            const g = document.getElementById('offlineGrouped');
+            if (g) renderGrouped(all, g);
+        } else {
+            // En ligne : on laisse la liste PHP, on affiche seulement les locaux non sync
+            if (pending.length === 0) {
+                root.innerHTML = '';
+                return;
+            }
+            root.innerHTML = `
+                <div style="margin-top:1.5rem;">
+                    <div class="cat-section-header" style="background:#FFF8E1;border-color:#FFE082;">
+                        <div class="cat-section-title" style="color:#F57F17;">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>
+                            Créés hors ligne — en attente de sync
+                            <span class="badge-pending" style="margin-left:8px;">${pending.length}</span>
+                        </div>
+                    </div>
+                    <div class="examens-grid" id="pendingLocalGrid"></div>
+                </div>`;
+            const grid = document.getElementById('pendingLocalGrid');
+            if (grid) grid.innerHTML = pending.map(cardHtml).join('');
+        }
+
+        // Suppression locale
+        root.querySelectorAll('[data-local-delete]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.getAttribute('data-local-delete');
+                if (!confirm('Supprimer cet examen local ?')) return;
+                await LocalDB.remove('examens', id, BASE + 'admin/examens/' + id + '/delete', {
+                    type: 'examens',
+                    label: 'Suppression locale ' + id
+                });
+                refresh();
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', refresh);
+    window.addEventListener('localdb:examens-updated', refresh);
+    window.addEventListener('outbox:updated', refresh);
+    window.addEventListener('online', async () => {
+        if (typeof LocalDB !== 'undefined') {
+            await LocalDB.syncAll(true);
+            // Recharge la page pour récupérer les IDs serveur après sync
+            setTimeout(() => { window.location.reload(); }, 600);
+        }
+    });
+    window.addEventListener('offline', refresh);
+})();
 </script>
 
 <?php include dirname(__DIR__) .

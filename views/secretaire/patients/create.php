@@ -463,21 +463,39 @@ document.getElementById('formPatient').addEventListener('submit', async function
 
     try {
         if (!navigator.onLine) throw new Error('offline');
-        const res = await fetch(form.action, { method: 'POST', body: fd });
+        const res = await fetch(form.action, {
+            method: 'POST',
+            body: fd,
+            credentials: 'include'
+        });
         window.location.href = res.url || '<?= BASE_URL ?>secretaire/patients';
     } catch (err) {
         const fields = [];
         fd.forEach((v, k) => fields.push([k, v]));
-        await OfflineOutbox.enqueue({
+        await LocalDB.enqueue({
             type:  'patient',
             url:   form.action,
             label: 'Nouveau patient — ' + nom + ' ' + prenom,
             fields,
         });
-        OfflineOutbox.toast(
-            'Hors ligne : patient enregistré localement, il sera créé sur le serveur au retour du réseau.'
+        LocalDB.toast(
+            'Hors ligne : patient enregistré localement, il sera créé sur le serveur au retour du réseau.',
+            'info'
         );
-        window.location.href = '<?= BASE_URL ?>secretaire/patients?queued=1';
+        const listUrl = '<?= BASE_URL ?>secretaire/patients?queued=1';
+        try {
+            const cached = await caches.match('<?= BASE_URL ?>secretaire/patients');
+            if (cached) {
+                window.location.href = listUrl;
+            } else {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                form.reset();
+            }
+        } catch (_) {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
     }
 });
 </script>
