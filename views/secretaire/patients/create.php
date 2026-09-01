@@ -472,30 +472,21 @@ document.getElementById('formPatient').addEventListener('submit', async function
     } catch (err) {
         const fields = [];
         fd.forEach((v, k) => fields.push([k, v]));
-        await LocalDB.enqueue({
-            type:  'patient',
-            url:   form.action,
-            label: 'Nouveau patient — ' + nom + ' ' + prenom,
+        const payload = {
+            nom, prenom, sexe, telephone,
+            date_naissance: form.querySelector('[name="date_naissance"]')?.value || '',
+            adresse: form.querySelector('[name="adresse"]')?.value || ''
+        };
+        await LocalDB.create('patients', payload, form.action, {
+            type: 'patient',
             fields,
+            label: 'Nouveau patient — ' + nom + ' ' + prenom
         });
         LocalDB.toast(
-            'Hors ligne : patient enregistré localement, il sera créé sur le serveur au retour du réseau.',
-            'info'
+            'Patient enregistré sur cet appareil. Tu peux continuer hors ligne.',
+            'success'
         );
-        const listUrl = '<?= BASE_URL ?>secretaire/patients?queued=1';
-        try {
-            const cached = await caches.match('<?= BASE_URL ?>secretaire/patients');
-            if (cached) {
-                window.location.href = listUrl;
-            } else {
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                form.reset();
-            }
-        } catch (_) {
-            btn.innerHTML = originalHTML;
-            btn.disabled = false;
-        }
+        window.location.href = '<?= BASE_URL ?>secretaire/patients';
     }
 });
 </script>

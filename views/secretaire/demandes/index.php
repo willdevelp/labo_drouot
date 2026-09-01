@@ -173,4 +173,74 @@ include __DIR__ . '/../../../views/layouts/header.php';
 .btn-outline-drouot:hover { border-color:#1E88E5; color:#1E88E5; }
 </style>
 
+
+<div id="offlineDemandesRoot"></div>
+<script>
+(function () {
+    const SERVER = <?= json_encode(array_map(function ($d) {
+        return [
+            'id' => (string)$d['id'],
+            'reference' => $d['reference'] ?? $d['ref'] ?? '',
+            'patient_nom' => trim(($d['patient_nom'] ?? '') . ' ' . ($d['patient_prenom'] ?? '')),
+            'statut' => $d['statut'] ?? '',
+            'created_at' => $d['created_at'] ?? '',
+            'synced' => 1,
+        ];
+    }, $demandes ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function isLocal(id) { return String(id).startsWith('local_'); }
+
+    async function refresh() {
+        if (typeof LocalDB === 'undefined') return;
+        try { if (SERVER.length) await LocalDB.seedStore('demandes', SERVER); } catch(e){}
+        const all = (await LocalDB.getAll('demandes')).filter(x => !x._deleted);
+        const pending = all.filter(x => isLocal(x.id) || x.synced === 0);
+        const root = document.getElementById('offlineDemandesRoot');
+        if (!root) return;
+
+        if (!navigator.onLine) {
+            document.querySelectorAll('.table-drouot').forEach(t => t.style.display = 'none');
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;"><i class="fas fa-database me-1"></i> Mode hors ligne</strong>
+                — ${all.length} demande(s)
+              </div>
+              <div class="card-drouot"><div class="table-responsive"><table class="table-drouot" style="width:100%">
+                <thead><tr><th>Réf.</th><th>Patient</th><th>Statut</th><th></th></tr></thead>
+                <tbody>
+                ${all.length ? all.map(d => `
+                  <tr>
+                    <td class="ref-code">${esc(d.reference || d.id)}</td>
+                    <td>${esc(d.patient_nom || ('Patient #' + (d.patient_id || '')))}</td>
+                    <td>${esc(d.statut || 'local')}</td>
+                    <td>${isLocal(d.id)||d.synced===0 ? '<span class="badge-pending">Local</span>' : ''}</td>
+                  </tr>`).join('') : '<tr><td colspan="4">Aucune demande locale</td></tr>'}
+                </tbody>
+              </table></div></div>`;
+        } else if (pending.length) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;">${pending.length} demande(s) créée(s) hors ligne</strong>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:.85rem;">
+                  ${pending.map(d => `<li>${esc(d.reference || d.id)} — ${esc(d.patient_nom || d.label || '')}</li>`).join('')}
+                </ul>
+              </div>`;
+        } else root.innerHTML = '';
+    }
+    document.addEventListener('DOMContentLoaded', refresh);
+    window.addEventListener('localdb:demandes-updated', refresh);
+    window.addEventListener('outbox:updated', refresh);
+    window.addEventListener('online', async () => {
+        if (typeof LocalDB !== 'undefined') {
+            await LocalDB.syncAll(true);
+            setTimeout(() => location.reload(), 500);
+        }
+    });
+    window.addEventListener('offline', refresh);
+})();
+</script>
+
 <?php include __DIR__ . '/../../../views/layouts/footer.php'; ?>

@@ -26,7 +26,7 @@ include __DIR__ . '/../../../views/layouts/header.php';
 </div>
 <?php endif; ?>
 
-<form method="POST" action="<?= BASE_URL ?>secretaire/demandes/store" id="formDemande" data-offline-store="examens">
+<form method="POST" action="<?= BASE_URL ?>secretaire/demandes/store" id="formDemande" data-offline-store="demandes">
 <div class="row g-4">
 
     <!-- ══════════════════════════════════════
@@ -1115,6 +1115,53 @@ document.getElementById('formDemande').addEventListener('submit',function(e){
     const btn=document.getElementById('submitBtn');
     btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Création...'; btn.disabled=true;
 });
+</script>
+
+
+<script>
+// Offline-first demandes
+(function () {
+    const form = document.getElementById('formDemande');
+    if (!form) return;
+    form.addEventListener('submit', async function (e) {
+        if (navigator.onLine) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const fd = new FormData(form);
+        const patientId = fd.get('patient_id');
+        if (!patientId) {
+            alert('Sélectionnez un patient');
+            return;
+        }
+        const examenIds = fd.getAll('examen_ids[]');
+        if (!examenIds.length) {
+            alert('Sélectionnez au moins un examen');
+            return;
+        }
+
+        const fields = [];
+        fd.forEach((v, k) => fields.push([k, v]));
+        const payload = {
+            patient_id: String(patientId),
+            medecin_id: String(fd.get('medecin_id') || ''),
+            assurance_id: String(fd.get('assurance_id') || ''),
+            numero_police: String(fd.get('numero_police') || ''),
+            code_accord: String(fd.get('code_accord') || ''),
+            examen_ids: examenIds.map(String),
+            statut: 'brouillon_local',
+            created_label: 'Demande locale'
+        };
+
+        await LocalDB.create('demandes', payload, form.action, {
+            type: 'demande',
+            fields,
+            label: 'Nouvelle demande — patient #' + patientId + ' (' + examenIds.length + ' examen(s))'
+        });
+        LocalDB.toast('Demande enregistrée sur cet appareil', 'success');
+        window.location.href = '<?= BASE_URL ?>secretaire/demandes';
+    }, true);
+})();
 </script>
 
 <?php include __DIR__ . '/../../../views/layouts/footer.php'; ?>

@@ -11,12 +11,12 @@
  */
 const LocalDB = (function () {
     const DB_NAME    = 'labo-drouot-db';
-    const DB_VERSION = 4;
+    const DB_VERSION = 5;
 
     // Stores métier (étendus pour couvrir toutes les vues)
     const STORES = [
         'users', 'resultats', 'stocks', 'patients', 'examens',
-        'assurances', 'medecins', 'parametres', 'commissions', 'validations'
+        'assurances', 'medecins', 'parametres', 'commissions', 'validations', 'demandes'
     ];
 
     // ── Helpers IndexedDB ──────────────────────────────────────────────
@@ -182,6 +182,51 @@ const LocalDB = (function () {
     }
 
     /**
+     * Après un POST réussi : met à jour le store métier local.
+     * CREATE → supprime l'enregistrement temporaire local_*
+     * UPDATE → marque synced=1
+     * DELETE → purge l'enregistrement
+     */
+    async function applyLocalAfterSync(item) {
+        const storeName = item.storeName;
+        if (!storeName) return;
+
+        const db = await openDB();
+        if (!db.objectStoreNames.contains(storeName)) return;
+
+        const entityKey = item.entityLocalId || item.id;
+        if (entityKey == null) return;
+
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const action = (item.action || 'POST').toUpperCase();
+
+            if (action === 'CREATE' || action === 'POST') {
+                // L'id serveur n'est pas connu (redirect PHP) :
+                // on retire la version locale pour éviter les doublons.
+                try { store.delete(entityKey); } catch (_) { /* ignore */ }
+            } else if (action === 'UPDATE') {
+                const req = store.get(entityKey);
+                req.onsuccess = () => {
+                    const cur = req.result;
+                    if (cur) {
+                        cur.synced = 1;
+                        store.put(cur);
+                    }
+                };
+            } else if (action === 'DELETE') {
+                try { store.delete(entityKey); } catch (_) { /* ignore */ }
+            }
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+
+        window.dispatchEvent(new CustomEvent(`localdb:${storeName}-updated`));
+    }
+
+    /**
      * Rejoue une entrée outbox (POST FormData prioritaire, sinon JSON).
      * credentials: 'include' pour envoyer le cookie de session PHP.
      */
@@ -192,7 +237,6 @@ const LocalDB = (function () {
 
         const key = normalizeOutboxKey(localId);
         if (key === null) {
-            // Ancienne entrée corrompue : on la supprime pour ne pas bloquer la file
             try { await deleteOutboxItem(localId); } catch (_) { /* ignore */ }
             return { ok: false, error: 'invalid_key' };
         }
@@ -206,21 +250,41 @@ const LocalDB = (function () {
         });
 
         if (!item) return { ok: false, error: 'not_found' };
+        if (!item.url) return { ok: false, error: 'no_url' };
 
         try {
-            let response;
             const fetchOpts = {
                 method: 'POST',
                 credentials: 'include',
                 redirect: 'follow'
             };
 
-            if (item.fields && Array.isArray(item.fields)) {
-                const fd = new FormData();
+            // Construire FormData depuis fields OU payload
+            let response;
+            const fd = new FormData();
+            let hasFields = false;
+
+            if (item.fields && Array.isArray(item.fields) && item.fields.length) {
                 item.fields.forEach(([k, v]) => {
                     if (v instanceof File && v.size === 0) return;
+                    if (v === undefined || v === null) return;
                     fd.append(k, v);
+                    hasFields = true;
                 });
+            }
+            if (!hasFields && item.payload && typeof item.payload === 'object') {
+                Object.entries(item.payload).forEach(([k, v]) => {
+                    if (v === undefined || v === null) return;
+                    if (Array.isArray(v)) {
+                        v.forEach(vv => fd.append(k, vv));
+                    } else {
+                        fd.append(k, String(v));
+                    }
+                    hasFields = true;
+                });
+            }
+
+            if (hasFields) {
                 response = await fetch(item.url, { ...fetchOpts, body: fd });
             } else {
                 response = await fetch(item.url, {
@@ -238,14 +302,27 @@ const LocalDB = (function () {
             }
 
             const finalUrl = response.url || '';
-            const isLoginRedirect = /\/login/i.test(finalUrl);
+            const isLoginRedirect = /\/login(\?|$)/i.test(finalUrl);
 
-            if (!isLoginRedirect && (response.ok || response.redirected || (response.status >= 200 && response.status < 400))) {
+            // Échec validation PHP : souvent retour sur /create avec erreur session
+            const isCreateBounce = /\/create/i.test(finalUrl) && /examens|patients|stocks|medecins|assurances|demandes/i.test(finalUrl);
+
+            if (!isLoginRedirect && !isCreateBounce &&
+                (response.ok || response.redirected || (response.status >= 200 && response.status < 400))) {
                 await deleteOutboxItem(key);
-                return { ok: true, response };
+                try {
+                    await applyLocalAfterSync(item);
+                } catch (e) {
+                    console.warn('applyLocalAfterSync', e);
+                }
+                return { ok: true, response, finalUrl };
             }
-            return { ok: false, error: isLoginRedirect ? 'auth' : ('http_' + response.status) };
+
+            const errCode = isLoginRedirect ? 'auth' : (isCreateBounce ? 'validation' : ('http_' + response.status));
+            console.warn('[LocalDB] syncOne failed', errCode, item.url, finalUrl);
+            return { ok: false, error: errCode, finalUrl };
         } catch (err) {
+            console.warn('[LocalDB] syncOne network error', err);
             return { ok: false, error: err.message || 'network' };
         }
     }
@@ -262,24 +339,33 @@ const LocalDB = (function () {
 
         let synced = 0;
         let failed = 0;
+        let lastError = null;
 
         for (const item of items) {
-            // localId peut être absent sur d'anciennes entrées : utiliser la clé IDB
             const key = item.localId != null ? item.localId : item.id;
             const result = await syncOne(key);
             if (result.ok) {
                 synced++;
             } else {
                 failed++;
+                lastError = result.error;
                 if (result.error === 'offline' || result.error === 'network') break;
             }
         }
 
+        window.dispatchEvent(new CustomEvent('outbox:updated'));
+
         if (synced > 0) {
-            window.dispatchEvent(new CustomEvent('outbox:updated'));
             toast(synced + ' action(s) synchronisée(s)', 'success');
+        } else if (failed > 0 && force) {
+            const msg = lastError === 'auth'
+                ? 'Session expirée — reconnecte-toi puis réessaie.'
+                : (lastError === 'validation'
+                    ? 'Données refusées par le serveur (champs incomplets ?).'
+                    : 'Échec de synchronisation (' + (lastError || 'erreur') + ').');
+            toast(msg, 'error');
         }
-        return { synced, failed };
+        return { synced, failed, lastError };
     }
 
     // ── CRUD métier ────────────────────────────────────────────────────

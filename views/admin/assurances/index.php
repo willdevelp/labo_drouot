@@ -330,7 +330,7 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                 Ajouter une compagnie
             </h6>
 
-            <form method="POST" action="<?= BASE_URL ?>admin/assurances/store" id="formCreateAssurance">
+            <form method="POST" action="<?= BASE_URL ?>admin/assurances/store" id="formCreateAssurance" data-offline-store="assurances">
                 <div class="row g-2">
                     <div class="col-12">
                         <label class="form-label-drouot">
@@ -541,16 +541,99 @@ function toggleCreances(id) {
 }
 
 // ── Hors ligne : création d'une compagnie ────────────────
-OfflineOutbox.bindForm(document.getElementById('formCreateAssurance'), {
-    type: 'assurance',
-    label: (form) => 'Nouvelle compagnie — ' + (form.querySelector('[name="nom"]').value || '—'),
-    redirect: '<?= BASE_URL ?>admin/assurances',
-});
+/* offline-first via LocalDB */
 </script>
 
-<div id="pendingAssurancesBox" style="display:none;"></div>
+
+
+
+<div id="offlineAssurancesRoot"></div>
 <script>
-OfflineOutbox.renderPendingWidget('pendingAssurancesBox', ['assurance']);
+(function () {
+    const SERVER = <?= json_encode(array_map(function ($a) {
+        return [
+            'id' => (string)$a['id'],
+            'nom' => $a['nom'] ?? '',
+            'code' => $a['code'] ?? '',
+            'telephone' => $a['telephone'] ?? '',
+            'email' => $a['email'] ?? '',
+            'adresse' => $a['adresse'] ?? '',
+            'is_active' => (int)($a['is_active'] ?? 1),
+            'synced' => 1,
+        ];
+    }, $assurances ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function isLocal(id) { return String(id).startsWith('local_'); }
+
+    async function refresh() {
+        if (typeof LocalDB === 'undefined') return;
+        try { if (SERVER.length) await LocalDB.seedStore('assurances', SERVER); } catch(e){}
+        const all = (await LocalDB.getAll('assurances')).filter(x => !x._deleted);
+        const pending = all.filter(x => isLocal(x.id) || x.synced === 0);
+        const root = document.getElementById('offlineAssurancesRoot');
+        if (!root) return;
+
+        if (!navigator.onLine) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;"><i class="fas fa-database me-1"></i> Mode hors ligne</strong>
+                — ${all.length} compagnie(s)
+              </div>
+              <div class="card-drouot">
+                ${all.length ? all.map(a => `
+                  <div style="padding:10px 0;border-bottom:1px solid #f0f2f8;display:flex;justify-content:space-between;gap:8px;">
+                    <div>
+                      <strong>${esc(a.nom)}</strong>
+                      <div style="font-size:.8rem;color:#6b7a99;">${esc(a.code)} · ${esc(a.telephone)}</div>
+                    </div>
+                    ${isLocal(a.id)||a.synced===0 ? '<span class="badge-pending">Local</span>' : '<span class="badge-normal">Sync</span>'}
+                  </div>`).join('') : '<p class="text-muted mb-0">Aucune assurance locale</p>'}
+              </div>`;
+        } else if (pending.length) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;">${pending.length} compagnie(s) créée(s) hors ligne</strong>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:.85rem;">
+                  ${pending.map(a => `<li>${esc(a.nom)}</li>`).join('')}
+                </ul>
+              </div>`;
+        } else root.innerHTML = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('formCreateAssurance');
+        if (form) {
+            form.addEventListener('submit', async function (e) {
+                if (navigator.onLine) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const fd = new FormData(form);
+                const fields = []; fd.forEach((v,k) => fields.push([k,v]));
+                const payload = Object.fromEntries(Array.from(fd.entries()).filter(([,v]) => typeof v === 'string'));
+                if (!payload.nom) { alert('Nom obligatoire'); return; }
+                await LocalDB.create('assurances', { ...payload, is_active: 1 }, form.action, {
+                    type: 'assurance', fields, label: 'Nouvelle compagnie — ' + payload.nom
+                });
+                LocalDB.toast('Assurance enregistrée localement', 'success');
+                form.reset();
+                refresh();
+            }, true);
+        }
+        refresh();
+    });
+    window.addEventListener('localdb:assurances-updated', refresh);
+    window.addEventListener('outbox:updated', refresh);
+    window.addEventListener('online', async () => {
+        if (typeof LocalDB !== 'undefined') {
+            await LocalDB.syncAll(true);
+            setTimeout(() => location.reload(), 500);
+        }
+    });
+    window.addEventListener('offline', refresh);
+})();
 </script>
 
 <?php include dirname(__DIR__) . '/../../views/layouts/footer.php'; ?>

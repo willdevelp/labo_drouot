@@ -557,18 +557,102 @@ function toggleCommissions(id) {
 }
 
 // ── Hors ligne : création d'un médecin ───────────────────
-OfflineOutbox.bindForm(document.getElementById('formCreateMedecin'), {
-    type: 'medecin',
-    label: (form) => 'Nouveau médecin — Dr ' +
-        (form.querySelector('[name="nom"]').value || '') + ' ' +
-        (form.querySelector('[name="prenom"]').value || ''),
-    redirect: '<?= BASE_URL ?>admin/medecins',
-});
+/* offline-first: data-offline-store + app-offline.js */
 </script>
 
-<div id="pendingMedecinsBox" style="display:none;"></div>
+<!-- offline medecins injected below -->
+
+
+<div id="offlineMedecinsRoot"></div>
 <script>
-OfflineOutbox.renderPendingWidget('pendingMedecinsBox', ['medecin']);
+(function () {
+    const SERVER = <?= json_encode(array_map(function ($m) {
+        return [
+            'id' => (string)$m['id'],
+            'nom' => $m['nom'] ?? '',
+            'prenom' => $m['prenom'] ?? '',
+            'specialite' => $m['specialite'] ?? '',
+            'telephone' => $m['telephone'] ?? '',
+            'email' => $m['email'] ?? '',
+            'clinique' => $m['clinique'] ?? '',
+            'taux_commission' => (float)($m['taux_commission'] ?? 0),
+            'is_active' => (int)($m['is_active'] ?? 1),
+            'synced' => 1,
+        ];
+    }, $medecins ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function isLocal(id) { return String(id).startsWith('local_'); }
+
+    async function refresh() {
+        if (typeof LocalDB === 'undefined') return;
+        try { if (SERVER.length) await LocalDB.seedStore('medecins', SERVER); } catch (e) {}
+        const all = (await LocalDB.getAll('medecins')).filter(x => !x._deleted);
+        const pending = all.filter(x => isLocal(x.id) || x.synced === 0);
+        const root = document.getElementById('offlineMedecinsRoot');
+        if (!root) return;
+
+        if (!navigator.onLine) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;"><i class="fas fa-database me-1"></i> Mode hors ligne</strong>
+                — ${all.length} médecin(s) sur cet appareil
+              </div>
+              <div class="card-drouot">
+                ${all.length ? all.map(m => `
+                  <div style="padding:10px 0;border-bottom:1px solid #f0f2f8;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                    <div>
+                      <strong>Dr ${esc(m.nom)} ${esc(m.prenom)}</strong>
+                      <div style="font-size:.8rem;color:#6b7a99;">${esc(m.specialite)} · ${esc(m.telephone)}</div>
+                    </div>
+                    <div>${isLocal(m.id)||m.synced===0 ? '<span class="badge-pending">Local</span>' : '<span class="badge-normal">Sync</span>'}</div>
+                  </div>`).join('') : '<p class="text-muted mb-0">Aucun médecin local</p>'}
+              </div>`;
+        } else if (pending.length) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;">${pending.length} médecin(s) créé(s) hors ligne</strong>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:.85rem;">
+                  ${pending.map(m => `<li>Dr ${esc(m.nom)} ${esc(m.prenom)}</li>`).join('')}
+                </ul>
+              </div>`;
+        } else root.innerHTML = '';
+    }
+
+    // Interception offline du formulaire create (en plus de data-offline-store)
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('formCreateMedecin');
+        if (form) {
+            form.addEventListener('submit', async function (e) {
+                if (navigator.onLine) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const fd = new FormData(form);
+                const fields = []; fd.forEach((v,k) => fields.push([k,v]));
+                const payload = Object.fromEntries(Array.from(fd.entries()).filter(([,v]) => typeof v === 'string'));
+                if (!payload.nom || !payload.prenom) { alert('Nom et prénom obligatoires'); return; }
+                await LocalDB.create('medecins', { ...payload, is_active: 1 }, form.action, {
+                    type: 'medecin', fields, label: 'Nouveau médecin — Dr ' + payload.nom + ' ' + payload.prenom
+                });
+                LocalDB.toast('Médecin enregistré localement', 'success');
+                form.reset();
+                refresh();
+            }, true);
+        }
+        refresh();
+    });
+    window.addEventListener('localdb:medecins-updated', refresh);
+    window.addEventListener('outbox:updated', refresh);
+    window.addEventListener('online', async () => {
+        if (typeof LocalDB !== 'undefined') {
+            await LocalDB.syncAll(true);
+            setTimeout(() => location.reload(), 500);
+        }
+    });
+    window.addEventListener('offline', refresh);
+})();
 </script>
 
 <?php include dirname(__DIR__) . '/../../views/layouts/footer.php'; ?>

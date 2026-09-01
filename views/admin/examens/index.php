@@ -433,20 +433,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 <span class="examen-prix">${formatPrix(ex.prix)}</span>
             </div>
             <div class="examen-card-actions">
+                <button type="button" class="action-btn action-btn-primary" title="Paramètres"
+                    onclick="OfflineLists.manageParametres('${esc(ex.id)}')">
+                    <i class="fas fa-sliders"></i>
+                </button>
+                <button type="button" class="action-btn action-btn-edit" title="Modifier"
+                    onclick="OfflineLists.editExamen('${esc(ex.id)}')">
+                    <i class="fas fa-pen"></i>
+                </button>
                 ${pending ? `
-                    <span style="font-size:.75rem;color:#F57F17;">
-                        <i class="fas fa-database"></i> Disponible hors ligne — sync auto à la reconnexion
-                    </span>
                     <button type="button" class="action-btn action-btn-danger" title="Supprimer localement"
                         data-local-delete="${esc(ex.id)}">
                         <i class="fas fa-trash"></i>
                     </button>
                 ` : `
-                    <a href="${BASE}admin/examens/${esc(ex.id)}/parametres" class="action-btn action-btn-primary" title="Paramètres">
-                        <i class="fas fa-sliders"></i>
-                    </a>
-                    <a href="${BASE}admin/examens/${esc(ex.id)}/edit" class="action-btn action-btn-edit" title="Modifier">
-                        <i class="fas fa-pen"></i>
+                    <a href="${BASE}admin/examens/${esc(ex.id)}/parametres" class="action-btn action-btn-primary" title="Paramètres (page)" style="opacity:.7">
+                        <i class="fas fa-external-link-alt" style="font-size:.65rem"></i>
                     </a>
                 `}
             </div>

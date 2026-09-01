@@ -340,9 +340,75 @@ function toggleAjust(id) {
 }
 </script>
 
-<div id="pendingStockBox" style="display:none;"></div>
+<div id="offlineStocksRoot"></div>
 <script>
-OfflineOutbox.renderPendingWidget('pendingStockBox', ['stock']);
+(function () {
+    const SERVER = <?= json_encode(array_map(function ($s) {
+        return [
+            'id' => (string)$s['id'],
+            'name' => $s['name'] ?? '',
+            'code' => $s['code'] ?? '',
+            'categorie' => $s['categorie'] ?? '',
+            'quantite' => (float)($s['quantite'] ?? $s['quantity'] ?? 0),
+            'seuil_alerte' => (float)($s['seuil_alerte'] ?? 0),
+            'synced' => 1,
+        ];
+    }, $stocks ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function isLocal(id) { return String(id).startsWith('local_'); }
+
+    async function refresh() {
+        if (typeof LocalDB === 'undefined') return;
+        try { if (SERVER.length) await LocalDB.seedStore('stocks', SERVER); } catch(e){}
+        const all = (await LocalDB.getAll('stocks')).filter(x => !x._deleted);
+        const pending = all.filter(x => isLocal(x.id) || x.synced === 0);
+        const root = document.getElementById('offlineStocksRoot');
+        if (!root) return;
+
+        if (!navigator.onLine) {
+            document.querySelectorAll('.table-drouot').forEach(t => { t.style.display = 'none'; });
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;"><i class="fas fa-database me-1"></i> Mode hors ligne</strong>
+                — ${all.length} article(s) stock
+              </div>
+              <div class="card-drouot"><div class="table-responsive"><table class="table-drouot" style="width:100%">
+                <thead><tr><th>Nom</th><th>Code</th><th>Catégorie</th><th>Qté</th><th></th></tr></thead>
+                <tbody>
+                ${all.length ? all.map(s => `
+                  <tr>
+                    <td>${esc(s.name || s.nom)}</td>
+                    <td>${esc(s.code)}</td>
+                    <td>${esc(s.categorie)}</td>
+                    <td>${esc(s.quantite ?? s.quantity ?? 0)}</td>
+                    <td>${isLocal(s.id)||s.synced===0 ? '<span class="badge-pending">Local</span>' : ''}</td>
+                  </tr>`).join('') : '<tr><td colspan="5">Aucun stock local</td></tr>'}
+                </tbody>
+              </table></div></div>`;
+        } else if (pending.length) {
+            root.innerHTML = `
+              <div class="card-drouot mb-3" style="border-color:#FFE082;background:#FFFDE7;">
+                <strong style="color:#F57F17;">${pending.length} article(s) créé(s) hors ligne</strong>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:.85rem;">
+                  ${pending.map(s => `<li>${esc(s.name || s.nom)} (${esc(s.code)})</li>`).join('')}
+                </ul>
+              </div>`;
+        } else root.innerHTML = '';
+    }
+    document.addEventListener('DOMContentLoaded', refresh);
+    window.addEventListener('localdb:stocks-updated', refresh);
+    window.addEventListener('outbox:updated', refresh);
+    window.addEventListener('online', async () => {
+        if (typeof LocalDB !== 'undefined') {
+            await LocalDB.syncAll(true);
+            setTimeout(() => location.reload(), 500);
+        }
+    });
+    window.addEventListener('offline', refresh);
+})();
 </script>
 
 <?php include dirname(__DIR__) .

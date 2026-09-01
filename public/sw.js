@@ -15,7 +15,7 @@
  *    déconnexion sur un poste partagé.
  */
 
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v11';
 const SHELL_CACHE   = `labo-drouot-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `labo-drouot-pages-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `labo-drouot-runtime-${CACHE_VERSION}`;
@@ -29,6 +29,7 @@ const PRECACHE_URLS = [
     '/assets/js/LocalDB.js',
     '/assets/js/app-offline.js',
     '/assets/js/pwa-install.js',
+    '/assets/js/offline-lists.js',
     'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css',
