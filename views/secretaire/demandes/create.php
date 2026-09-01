@@ -26,7 +26,7 @@ include __DIR__ . '/../../../views/layouts/header.php';
 </div>
 <?php endif; ?>
 
-<form method="POST" action="<?= BASE_URL ?>secretaire/demandes/store" id="formDemande">
+<form method="POST" action="<?= BASE_URL ?>secretaire/demandes/store" id="formDemande" data-offline-store="examens">
 <div class="row g-4">
 
     <!-- ══════════════════════════════════════

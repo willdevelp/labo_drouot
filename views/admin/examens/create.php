@@ -30,8 +30,10 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
     <div class="col-xl-8">
         <form method="POST"
               action="<?= BASE_URL ?>admin/examens/store"
-              id="formExamen">
-
+              id="formExamen"
+              data-offline-store="examens"
+              data-redirect="<?= BASE_URL ?>admin/examens"
+        >
             <div class="card-drouot mb-4">
                 <h6 class="form-section-title">
                     <i class="fas fa-flask"></i>
@@ -235,10 +237,13 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
 .btn-outline-drouot:hover { border-color:#1E88E5; color:#1E88E5; }
 </style>
 
+<script src="/js/LocalDB.js"></script>
+
 <script>
 function setCategorie(val) {
     document.getElementById('catInput').value = val;
 }
+
 function fillExemple(code, nom, cat, prix) {
     document.querySelector('[name="code"]').value = code;
     document.querySelector('[name="nom"]').value  = nom;
@@ -246,12 +251,33 @@ function fillExemple(code, nom, cat, prix) {
     document.querySelector('[name="prix"]').value = prix;
 }
 
-// ── Hors ligne : création d'un examen ────────────────────
-OfflineOutbox.bindForm(document.getElementById('formExamen'), {
-    type: 'examen',
-    label: (form) => 'Nouvel examen — ' +
-        (form.querySelector('[name="nom"]').value.trim() || 'sans nom'),
-    redirect: '<?= BASE_URL ?>admin/examens',
+// ── Gestion Offline-First du formulaire Examen ────────────────────
+const formExamen = document.getElementById('formExamen');
+
+formExamen.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    // 1. Récupération des données saisies
+    const examenData = {
+        code: formExamen.querySelector('[name="code"]').value.trim() || 'EX-' + Date.now(),
+        nom: formExamen.querySelector('[name="nom"]').value.trim(),
+        categorie: document.getElementById('catInput').value.trim(),
+        prix: parseFloat(formExamen.querySelector('[name="prix"]').value) || 0,
+        description: formExamen.querySelector('[name="description"]').value.trim()
+    };
+
+    try {
+        // 2. Enregistrement instantané dans la base IndexedDB locale
+        await LocalDB.create('examens', examenData, '<?= BASE_URL ?>admin/examens/store');
+
+        // 3. Tenter une synchronisation automatique avec PHP en arrière-plan
+        LocalDB.syncAll();
+
+        // 4. Redirection immédiate vers la liste
+        window.location.href = '<?= BASE_URL ?>admin/examens';
+    } catch (err) {
+        console.error('Erreur lors de l\'enregistrement local :', err);
+    }
 });
 </script>
 

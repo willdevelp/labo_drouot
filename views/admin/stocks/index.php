@@ -222,7 +222,9 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                              style="display:none;">
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/stocks/<?= $s['id'] ?>/ajuster"
-                                  class="ajust-form">
+                                  class="ajust-form"
+                                  data-offline-store="stocks"
+                                  data-entity-id="<?= $s['id'] ?>">
                                 <select name="type"
                                         class="ajust-select">
                                     <option value="add">+ Ajouter</option>
@@ -260,8 +262,8 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/stocks/<?= $s['id'] ?>/delete"
                                   style="display:inline;"
-                                  class="js-offline-form"
-                                  data-offline-type="stock"
+                                  data-offline-store="stocks"
+                                  data-offline-delete-id="<?= $s['id'] ?>"
                                   data-offline-label="Suppression stock — <?= htmlspecialchars($s['name']) ?>"
                                   data-offline-redirect="<?= BASE_URL ?>admin/stocks">
                                 <button type="submit"

@@ -462,6 +462,8 @@ a { color:inherit; }
             <?php if ($permissions['peut_valider']): ?>
             <form method="POST"
                   action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/valider/<?= $d['id'] ?>"
+                  data-offline-store="assurances"
+                  data-entity-id="<?= $d['id'] ?>"
                   class="action-form">
                 <input type="text" name="code_accord" class="code-input"
                        placeholder="Votre code d'accord..." required>
@@ -471,6 +473,8 @@ a { color:inherit; }
             </form>
             <form method="POST"
                   action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/rejeter/<?= $d['id'] ?>"
+                  data-offline-store="assurances"
+                  data-entity-id="<?= $d['id'] ?>"
                   style="margin-top:8px;"
                   onsubmit="return confirm('Confirmer le rejet de cette prise en charge ?')">
                 <button type="submit" class="btn-rejeter">
@@ -516,16 +520,25 @@ a { color:inherit; }
             </a>
         </div>
         <form method="POST"
-              action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/import"
-              enctype="multipart/form-data">
-            <div class="upload-zone" onclick="document.getElementById('fichierInput').click()">
-                <i class="fas fa-cloud-arrow-up"></i>
-                <p class="upload-text">Cliquez pour sélectionner votre fichier .xlsx</p>
-                <input type="file" name="fichier" id="fichierInput"
-                       accept=".xlsx,.xls" required style="display:none;"
-                       onchange="this.form.submit()">
-            </div>
-        </form>
+      action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/import"
+      enctype="multipart/form-data"
+      id="formImportAssures"
+      data-offline-store="assurances"
+      data-offline-file="true"
+      data-redirect="<?= BASE_URL ?>assurance/portal/<?= $token ?>/assures">
+
+    <div class="upload-zone" onclick="document.getElementById('fichierInput').click()">
+        <i class="fas fa-cloud-arrow-up"></i>
+        <p class="upload-text">Cliquez pour sélectionner votre fichier .xlsx</p>
+        <input type="file"
+               name="fichier"
+               id="fichierInput"
+               accept=".xlsx,.xls"
+               required
+               style="display:none;"
+               onchange="this.closest('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))">
+    </div>
+</form>
         <p class="import-help">
             Colonnes attendues : Numéro de police, Nom de l'assuré, Statut
             (en_regle ou suspendu). Le ré-import met à jour les numéros
@@ -565,14 +578,18 @@ a { color:inherit; }
                        onclick="this.select()">
             </div>
             <div class="sc-actions">
-                <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/sous-comptes/<?= $sc['id'] ?>/toggle">
+                <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/sous-comptes/<?= $sc['id'] ?>/toggle"
+                 data-offline-store="assurances"
+                 data-entity-id="<?= $sc['id'] ?>">
                     <button type="submit" class="btn-sc-action">
                         <i class="fas <?= $sc['is_active'] ? 'fa-eye-slash' : 'fa-eye' ?>"></i>
                         <?= $sc['is_active'] ? 'Désactiver' : 'Activer' ?>
                     </button>
                 </form>
                 <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/sous-comptes/<?= $sc['id'] ?>/delete"
-                      onsubmit="return confirm('Supprimer ce sous-compte ?')">
+                      onsubmit="return confirm('Supprimer ce sous-compte ?')"
+                      data-offline-store="assurances"
+                      data-offline-delete-id="<?= $sc['id'] ?>">
                     <button type="submit" class="btn-sc-action btn-sc-danger">
                         <i class="fas fa-trash"></i> Supprimer
                     </button>
@@ -590,7 +607,7 @@ a { color:inherit; }
 
     <div class="creer-sc-card">
         <p class="creer-sc-title">Créer un nouveau sous-compte</p>
-        <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/sous-comptes/store">
+        <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/sous-comptes/store" data-offline-store="assurances">
             <input type="text" name="nom" class="code-input" style="width:100%;margin-bottom:10px;"
                    placeholder="Nom du sous-compte (ex: Agence Bonanjo)" required>
             <div class="sc-perm-checks">

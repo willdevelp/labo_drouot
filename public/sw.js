@@ -8,15 +8,14 @@
  *  - Fichiers statiques (CSS/JS/fonts/images, y compris CDN) :
  *    "stale-while-revalidate" -> affichage instantané depuis le cache
  *    tout en rafraîchissant en arrière-plan.
- *  - Aucune requête non-GET (POST/PUT/DELETE) n'est interceptée : les
- *    formulaires et actions d'écriture continuent de nécessiter le réseau
- *    tant que la synchro hors ligne (phase 2) n'est pas en place.
+ *  - Aucune requête non-GET (POST/PUT/DELETE) n'est interceptée par le SW :
+ *    les formulaires sont gérés côté page par LocalDB (outbox + sync).
  *  - /logout vide le cache des pages pour éviter qu'un écran déjà chargé
  *    (données patients, résultats...) reste consultable hors ligne après
  *    déconnexion sur un poste partagé.
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE   = `labo-drouot-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `labo-drouot-pages-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `labo-drouot-runtime-${CACHE_VERSION}`;
@@ -27,6 +26,9 @@ const PRECACHE_URLS = [
     '/manifest.json',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
+    '/assets/js/LocalDB.js',
+    '/assets/js/app-offline.js',
+    '/assets/js/pwa-install.js',
     'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css',
@@ -143,19 +145,18 @@ self.addEventListener('message', (event) => {
 });
 
 /**
- * Background Sync — rejoue la file d'attente hors ligne (voir
- * public/assets/js/offline-outbox.js) dès que le navigateur détecte le
- * retour du réseau, même si aucun onglet de l'app n'est ouvert.
- * Best-effort : les navigateurs qui ne supportent pas Background Sync
- * (ex. Safari) retombent sur la synchro déclenchée côté page (événement
- * 'online' + polling), déjà en place dans offline-outbox.js.
+ * Background Sync — rejoue la file d'attente hors ligne (LocalDB)
+ * dès que le navigateur détecte le retour du réseau, même si aucun
+ * onglet de l'app n'est ouvert.
+ * Best-effort : les navigateurs sans Background Sync (ex. Safari)
+ * retombent sur la synchro côté page (événement 'online').
  */
-const OUTBOX_DB_NAME = 'labo-drouot-outbox';
-const OUTBOX_STORE   = 'requests';
+const OUTBOX_DB_NAME = 'labo-drouot-db';
+const OUTBOX_STORE   = 'outbox';
 
 function openOutboxDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(OUTBOX_DB_NAME, 1);
+        const req = indexedDB.open(OUTBOX_DB_NAME);
         req.onsuccess = () => resolve(req.result);
         req.onerror   = () => reject(req.error);
     });
@@ -163,9 +164,13 @@ function openOutboxDB() {
 
 async function getAllOutboxItems(db) {
     return new Promise((resolve, reject) => {
+        if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
+            resolve([]);
+            return;
+        }
         const tx  = db.transaction(OUTBOX_STORE, 'readonly');
         const req = tx.objectStore(OUTBOX_STORE).getAll();
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => resolve(req.result || []);
         req.onerror   = () => reject(req.error);
     });
 }
@@ -183,17 +188,31 @@ async function syncOutboxFromSW() {
     const db    = await openOutboxDB();
     const items = (await getAllOutboxItems(db))
         .filter((i) => !i.manualOnly)
-        .sort((a, b) => a.createdAt - b.createdAt);
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
     for (const item of items) {
-        const fd = new FormData();
-        item.fields.forEach(([k, v]) => fd.append(k, v));
         try {
-            await fetch(item.url, { method: 'POST', body: fd });
+            if (item.fields && Array.isArray(item.fields)) {
+                const fd = new FormData();
+                item.fields.forEach(([k, v]) => fd.append(k, v));
+                await fetch(item.url, { method: 'POST', body: fd });
+            } else if (item.payload) {
+                await fetch(item.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: item.action,
+                        id: item.id,
+                        payload: item.payload
+                    })
+                });
+            } else {
+                continue;
+            }
             await deleteOutboxItem(db, item.localId);
         } catch (err) {
-            // Toujours hors ligne : on arrête, une nouvelle tentative de
-            // sync sera programmée automatiquement par le navigateur.
+            // Toujours hors ligne : on arrête, une nouvelle tentative
+            // sera programmée automatiquement par le navigateur.
             throw err;
         }
     }

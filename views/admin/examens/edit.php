@@ -32,10 +32,9 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
 <div class="col-xl-7">
     <form method="POST"
           action="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/edit"
-          class="js-offline-form"
-          data-offline-type="examen"
-          data-offline-label="<?= htmlspecialchars('Modification — ' . $examen['nom']) ?>"
-          data-offline-redirect="<?= BASE_URL ?>admin/examens">
+          data-offline-store="examens"
+          data-entity-id="<?= $examen['id'] ?>"
+          data-redirect="<?= BASE_URL ?>admin/examens">
 
         <div class="card-drouot mb-4">
             <h6 class="form-section-title">

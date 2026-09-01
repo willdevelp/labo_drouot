@@ -29,7 +29,7 @@ include __DIR__ . '/../../../views/layouts/header.php';
                 <i class="fas fa-flask"></i> Informations du réactif
             </h6>
 
-            <form method="POST" action="<?= BASE_URL ?>admin/stocks/store" id="formStock">
+            <form method="POST" action="<?= BASE_URL ?>admin/stocks/store" data-offline-store="stocks" id="formStock">
 
                 <!-- Nom -->
                 <div class="form-group mb-3">

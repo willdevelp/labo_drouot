@@ -312,6 +312,8 @@ include __DIR__ . '/../../../views/layouts/header.php';
 
             <form method="POST"
                   action="<?= BASE_URL ?>caissier/factures/<?= $facture['id'] ?>/payer"
+                  data-offline-store="commissions"
+                  data-entity-id="<?= $facture['id'] ?>"
                   id="formPaiement">
                 <input type="hidden" name="mode_paiement" id="modePaiementInput">
                 <input type="hidden" name="montant"

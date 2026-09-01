@@ -32,7 +32,7 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
 
 <form method="POST" action="<?= BASE_URL ?>admin/assurances/<?= $assurance['id'] ?>/taux/store"
       class="js-offline-form"
-      data-offline-type="assurance"
+      data-offline-store="assurances"
       data-offline-label="<?= htmlspecialchars('Taux — ' . $assurance['nom']) ?>"
       data-offline-redirect="<?= BASE_URL ?>admin/assurances/<?= $assurance['id'] ?>/taux">
 

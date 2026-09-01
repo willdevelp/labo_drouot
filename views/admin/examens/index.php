@@ -174,41 +174,35 @@ $openByDefault = $nbCategoriesAffichees <= 5;
                    title="Modifier">
                     <i class="fas fa-pen"></i>
                 </a>
-                <form method="POST"
-                      action="<?= BASE_URL ?>admin/examens/<?= $ex['id'] ?>/toggle"
-                      class="js-offline-form"
-                      data-offline-type="examen"
-                      data-offline-label="<?= htmlspecialchars(($ex['is_active'] ? 'Désactivation' : 'Activation') . ' — ' . $ex['nom']) ?>"
-                      data-offline-redirect="<?= BASE_URL ?>admin/examens"
-                      style="display:inline;">
-                    <button type="submit"
-                            class="action-btn
-                            <?= $ex['is_active']
-                                ? 'action-btn-warn'
-                                : 'action-btn-green' ?>"
-                            title="<?= $ex['is_active']
-                                ? 'Désactiver' : 'Activer' ?>">
-                        <i class="fas <?= $ex['is_active']
-                            ? 'fa-eye-slash' : 'fa-eye' ?>">
-                        </i>
-                    </button>
-                </form>
-                <form method="POST"
-                      action="<?= BASE_URL ?>admin/examens/<?= $ex['id'] ?>/delete"
-                      class="js-offline-form"
-                      data-offline-type="examen"
-                      data-offline-label="<?= htmlspecialchars('Suppression — ' . $ex['nom']) ?>"
-                      data-offline-redirect="<?= BASE_URL ?>admin/examens"
-                      style="display:inline;">
-                    <button type="submit"
-                            class="action-btn action-btn-danger"
-                            title="Supprimer"
-                            onclick="return confirm(
-                                'Supprimer <?= addslashes($ex['nom']) ?> ?'
-                            )">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </form>
+<form method="POST"
+      action="<?= BASE_URL ?>admin/examens/<?= $ex['id'] ?>/toggle"
+      data-offline-store="examens"
+      data-entity-id="<?= $ex['id'] ?>"
+      data-toggle-field="is_active"
+      data-toggle-value="<?= $ex['is_active'] ? 0 : 1 ?>"
+      data-redirect="<?= BASE_URL ?>admin/examens"
+      style="display:inline;">
+      
+    <button type="submit"
+            class="action-btn <?= $ex['is_active'] ? 'action-btn-warn' : 'action-btn-green' ?>"
+            title="<?= $ex['is_active'] ? 'Désactiver' : 'Activer' ?>">
+        <i class="fas <?= $ex['is_active'] ? 'fa-eye-slash' : 'fa-eye' ?>"></i>
+    </button>
+</form>
+<form method="POST"
+      action="<?= BASE_URL ?>admin/examens/<?= $ex['id'] ?>/delete"
+      data-offline-store="examens"
+      data-offline-delete-id="<?= $ex['id'] ?>"
+      data-redirect="<?= BASE_URL ?>admin/examens"
+      style="display:inline;">
+      
+    <button type="submit"
+            class="action-btn action-btn-danger"
+            title="Supprimer"
+            onclick="return confirm('Supprimer <?= addslashes($ex['nom']) ?> ?')">
+        <i class="fas fa-trash"></i>
+    </button>
+</form>
             </div>
         </div>
         <?php endforeach; ?>

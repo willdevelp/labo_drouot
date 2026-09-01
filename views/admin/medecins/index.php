@@ -154,11 +154,12 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                             </button>
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/medecins/<?= $m['id'] ?>/toggle"
-                                  class="js-offline-form"
-                                  data-offline-type="medecin"
+                                  data-offline-store="medecins"
+                                  data-entity-id="<?= $m['id'] ?>"
                                   data-offline-label="<?= htmlspecialchars(($m['is_active'] ? 'Désactivation' : 'Activation') . ' — Dr ' . $m['nom'] . ' ' . $m['prenom']) ?>"
                                   data-offline-redirect="<?= BASE_URL ?>admin/medecins"
                                   style="display:inline;">
+                                  <!-- <input type="hidden" name="is_active" value="<?= $m['is_active'] ? '0' : '1' ?>"> -->
                                 <button type="submit"
                                         class="action-btn <?= $m['is_active'] ? 'action-btn-warn' : 'action-btn-green' ?>"
                                         title="<?= $m['is_active'] ? 'Désactiver' : 'Activer' ?>">
@@ -167,8 +168,8 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                             </form>
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/medecins/<?= $m['id'] ?>/regenerer-token"
-                                  class="js-offline-form"
-                                  data-offline-type="medecin"
+                                  data-offline-store="medecins"
+                                  data-entity-id="<?= $m['id'] ?>"
                                   data-offline-label="<?= htmlspecialchars('Régénération lien — Dr ' . $m['nom'] . ' ' . $m['prenom']) ?>"
                                   data-offline-redirect="<?= BASE_URL ?>admin/medecins"
                                   style="display:inline;">
@@ -181,8 +182,8 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                             </form>
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/medecins/<?= $m['id'] ?>/delete"
-                                  class="js-offline-form"
-                                  data-offline-type="medecin"
+                                  data-offline-store="medecins"
+                                  data-offline-delete-id="<?= $m['id'] ?>"
                                   data-offline-label="<?= htmlspecialchars('Suppression — Dr ' . $m['nom'] . ' ' . $m['prenom']) ?>"
                                   data-offline-redirect="<?= BASE_URL ?>admin/medecins"
                                   style="display:inline;">
@@ -213,6 +214,8 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                             <?php if ($nbDues > 0): ?>
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/medecins/<?= $m['id'] ?>/payer-toutes-commissions"
+                                  data-offline-store="commissions"
+                                  data-entity-id="<?= $m['id'] ?>"
                                   class="mb-2">
                                 <button type="submit" class="btn-pay-all"
                                         onclick="return confirm('Marquer les <?= $nbDues ?> commission(s) due(s) comme payées ?')">
@@ -240,7 +243,9 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                                     </div>
                                     <?php if ($c['statut'] === 'due'): ?>
                                     <form method="POST"
-                                          action="<?= BASE_URL ?>admin/medecins/commissions/<?= $c['id'] ?>/payer">
+                                          action="<?= BASE_URL ?>admin/medecins/commissions/<?= $c['id'] ?>/payer"
+                                          data-offline-store="commissions"
+                                          data-entity-id="<?= $c['id'] ?>">
                                         <button type="submit" class="btn-pay-one"
                                                 title="Marquer comme payée">
                                             <i class="fas fa-check"></i>
@@ -263,8 +268,8 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                     <div class="medecin-edit-form" id="medEdit_<?= $m['id'] ?>" style="display:none;">
                         <form method="POST"
                               action="<?= BASE_URL ?>admin/medecins/<?= $m['id'] ?>/edit"
-                              class="js-offline-form"
-                              data-offline-type="medecin"
+                              data-offline-store="medecins"
+                              data-entity-id="<?= $m['id'] ?>"
                               data-offline-label="<?= htmlspecialchars('Modification — Dr ' . $m['nom'] . ' ' . $m['prenom']) ?>"
                               data-offline-redirect="<?= BASE_URL ?>admin/medecins">
                             <div class="edit-inline-grid">
@@ -334,7 +339,7 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                 Ajouter un médecin prescripteur
             </h6>
 
-            <form method="POST" action="<?= BASE_URL ?>admin/medecins/store" id="formCreateMedecin">
+            <form method="POST" action="<?= BASE_URL ?>admin/medecins/store" id="formCreateMedecin" data-offline-store="medecins">
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label-drouot">

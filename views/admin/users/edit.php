@@ -42,7 +42,9 @@ $icons = [
 
 <div class="col-xl-8">
     <form method="POST"
-          action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/edit">
+          action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/edit" 
+          data-offline-store="users"
+          data-entity-id="<?= $membre['id'] ?>">
 
         <!-- Identité -->
         <div class="card-drouot mb-4">

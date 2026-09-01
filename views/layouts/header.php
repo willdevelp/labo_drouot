@@ -51,8 +51,8 @@ $pageTitle = $pageTitles[$lastSeg] ?? 'Tableau de bord';
     <!-- Bootstrap 5 -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- File d'attente hors ligne -->
-    <script src="/assets/js/offline-outbox.js"></script>
+    <script src="/assets/js/LocalDB.js"></script>
+    <script src="/assets/js/app-offline.js"></script>
     <!-- Popup d'installation PWA -->
     <script src="/assets/js/pwa-install.js" defer></script>
 

@@ -28,6 +28,8 @@ include __DIR__ . '/../../../views/layouts/header.php';
 <form method="POST"
       action="<?= BASE_URL ?>secretaire/patients/store"
       enctype="multipart/form-data"
+      data-offline-store="examens"
+      data-offline-file="true"
       id="formPatient">
 
     <div class="row g-4">

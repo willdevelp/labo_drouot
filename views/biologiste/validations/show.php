@@ -263,6 +263,8 @@ $sexe = $echantillon['sexe'] === 'F' ? 'Féminin' : 'Masculin';
             <!-- Bouton valider -->
             <form method="POST"
                   action="<?= BASE_URL ?>biologiste/validations/<?= $echantillon['id'] ?>/valider"
+                  data-offline-store="examens"
+                  data-entity-id="<?= $echantillon['id'] ?>"
                   id="formValider">
                 <input type="hidden" name="commentaire"
                        id="commentaireInput">
@@ -400,7 +402,9 @@ $sexe = $echantillon['sexe'] === 'F' ? 'Féminin' : 'Masculin';
             </p>
             <form method="POST"
                   action="<?= BASE_URL ?>biologiste/validations/<?= $echantillon['id'] ?>/rejeter"
-                  id="formRejet">
+                  id="formRejet"
+                  data-offline-store="examens"
+                  data-entity-id="<?= $echantillon['id'] ?>">
                 <label class="form-label-drouot mb-1">
                     Motif de rejet <span style="color:#C62828;">*</span>
                 </label>

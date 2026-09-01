@@ -53,7 +53,9 @@ include __DIR__ . '/../../../views/layouts/header.php';
 
 <form method="POST"
       action="<?= BASE_URL ?>technicien/resultats/<?= $echantillon['id'] ?>/save"
-      id="formResultats">
+      id="formResultats"
+      data-offline-store="examens"
+      data-redirect="<?= BASE_URL ?>technicien/echantillons">
 
 <div class="row g-4">
 
@@ -351,7 +353,10 @@ include __DIR__ . '/../../../views/layouts/header.php';
 <!-- Formulaire transmission — EN DEHORS du formulaire principal -->
 <form method="POST"
       action="<?= BASE_URL ?>technicien/resultats/<?= $echantillon['id'] ?>/transmettre"
-      id="formTransmettre" style="display:none;">
+      id="formTransmettre"
+      data-offline-store="examens"
+      data-redirect="<?= BASE_URL ?>technicien/echantillons"
+      style="display:none;">
 </form>
 
 <style>
@@ -667,61 +672,6 @@ document.querySelectorAll('.param-abnormal').forEach(row => {
     }
 });
 updateAlertes();
-
-// ── Saisie hors ligne ─────────────────────────────────────
-(function () {
-    const form = document.getElementById('formResultats');
-    if (!form) return;
-    const btn = document.getElementById('btnSave');
-    const echantillonId = <?= (int) $echantillon['id'] ?>;
-
-    // Signale si des résultats de CET échantillon sont déjà en attente
-    // de synchro (ex : saisis hors ligne, page rechargée avant le retour
-    // du réseau).
-    async function checkPendingForThisEchantillon() {
-        try {
-            const items = await OfflineOutbox.getAll();
-            const pending = items.filter(i => i.type === 'resultats' && i.url === form.action);
-            if (pending.length > 0) {
-                OfflineOutbox.toast(
-                    'Des résultats saisis hors ligne pour cet échantillon sont en attente de synchronisation.'
-                );
-            }
-        } catch (err) { /* IndexedDB indisponible, on ignore */ }
-    }
-    checkPendingForThisEchantillon();
-
-    form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        const fd = new FormData(form);
-        fd.set('action', 'save');
-        const fields = [];
-        fd.forEach((v, k) => fields.push([k, v]));
-
-        const originalHTML = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
-
-        try {
-            if (!navigator.onLine) throw new Error('offline');
-            const res = await fetch(form.action, { method: 'POST', body: fd });
-            window.location.href = res.url || form.action;
-        } catch (err) {
-            await OfflineOutbox.enqueue({
-                type:  'resultats',
-                url:   form.action,
-                label: 'Résultats — échantillon ' + echantillonId,
-                fields,
-            });
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-            OfflineOutbox.toast(
-                'Hors ligne : résultats enregistrés localement, ils seront synchronisés automatiquement au retour du réseau.'
-            );
-        }
-    });
-})();
 </script>
 
 <?php include __DIR__ . '/../../../views/layouts/footer.php'; ?>

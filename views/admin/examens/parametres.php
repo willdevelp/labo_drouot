@@ -152,15 +152,14 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                                     <i class="fas fa-pen"></i>
                                 </button>
                                 <form method="POST"
-                                      action="<?= BASE_URL ?>admin/parametres/<?= $p['id'] ?>/delete"
-                                      class="js-offline-form"
-                                      data-offline-type="examen"
-                                      data-offline-label="<?= htmlspecialchars('Suppression paramètre — ' . $p['libelle']) ?>"
-                                      data-offline-redirect="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres"
-                                      style="display:inline;">
-                                    <input type="hidden"
-                                           name="examen_id"
-                                           value="<?= $examen['id'] ?>">
+                                    action="<?= BASE_URL ?>admin/parametres/<?= $p['id'] ?>/delete"
+                                    data-offline-store="parametres"
+                                    data-offline-delete-id="<?= $p['id'] ?>"
+                                    data-redirect="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres"
+                                    style="display:inline;">
+                                    
+                                    <input type="hidden" name="examen_id" value="<?= $examen['id'] ?>">
+                                    
                                     <button type="submit"
                                             class="action-btn action-btn-danger"
                                             title="Supprimer"
@@ -177,25 +176,23 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                          id="edit_<?= $p['id'] ?>"
                          style="display:none;">
                         <form method="POST"
-                              action="<?= BASE_URL ?>admin/parametres/<?= $p['id'] ?>/edit"
-                              class="js-offline-form"
-                              data-offline-type="examen"
-                              data-offline-label="<?= htmlspecialchars('Modification paramètre — ' . $p['libelle']) ?>"
-                              data-offline-redirect="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres">
-                            <input type="hidden" name="examen_id"
-                                   value="<?= $examen['id'] ?>">
+                            action="<?= BASE_URL ?>admin/parametres/<?= $p['id'] ?>/edit"
+                            data-offline-store="parametres"
+                            data-entity-id="<?= $p['id'] ?>"
+                            data-redirect="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres">
+
+                            <input type="hidden" name="examen_id" value="<?= $examen['id'] ?>">
+
                             <div class="edit-inline-grid">
                                 <div>
                                     <label class="form-label-drouot">
                                         Libellé *
                                     </label>
                                     <input type="text"
-                                           name="libelle"
-                                           class="form-input-drouot"
-                                           value="<?= htmlspecialchars(
-                                               $p['libelle']
-                                           ) ?>"
-                                           required>
+                                        name="libelle"
+                                        class="form-input-drouot"
+                                        value="<?= htmlspecialchars($p['libelle']) ?>"
+                                        required>
                                 </div>
                                 <div>
                                     <label class="form-label-drouot">
@@ -204,16 +201,13 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                                     <select name="type"
                                             class="form-input-drouot"
                                             onchange="toggleTypeFields(this, <?= $p['id'] ?>)">
-                                        <option value="numeric"
-                                            <?= $p['type']==='numeric' ? 'selected':'' ?>>
+                                        <option value="numeric" <?= $p['type']==='numeric' ? 'selected':'' ?>>
                                             Numérique
                                         </option>
-                                        <option value="text"
-                                            <?= $p['type']==='text' ? 'selected':'' ?>>
+                                        <option value="text" <?= $p['type']==='text' ? 'selected':'' ?>>
                                             Texte
                                         </option>
-                                        <option value="select"
-                                            <?= $p['type']==='select' ? 'selected':'' ?>>
+                                        <option value="select" <?= $p['type']==='select' ? 'selected':'' ?>>
                                             Liste
                                         </option>
                                     </select>
@@ -223,80 +217,74 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
                                         Unité
                                     </label>
                                     <input type="text"
-                                           name="unite"
-                                           class="form-input-drouot"
-                                           value="<?= htmlspecialchars(
-                                               $p['unite'] ?? ''
-                                           ) ?>"
-                                           placeholder="g/L, mmol/L...">
+                                        name="unite"
+                                        class="form-input-drouot"
+                                        value="<?= htmlspecialchars($p['unite'] ?? '') ?>"
+                                        placeholder="g/L, mmol/L...">
                                 </div>
                                 <div>
                                     <label class="form-label-drouot">
                                         Ordre
                                     </label>
                                     <input type="number"
-                                           name="ordre"
-                                           class="form-input-drouot"
-                                           value="<?= $p['ordre'] ?>"
-                                           min="1">
+                                        name="ordre"
+                                        class="form-input-drouot"
+                                        value="<?= $p['ordre'] ?>"
+                                        min="1">
                                 </div>
                                 <div id="editMin_<?= $p['id'] ?>"
-                                     class="<?= $p['type']==='select' ? 'hidden' : '' ?>">
+                                    class="<?= $p['type']==='select' ? 'hidden' : '' ?>">
                                     <label class="form-label-drouot">
                                         Min
                                     </label>
                                     <input type="number"
-                                           name="valeur_min"
-                                           step="0.01"
-                                           class="form-input-drouot"
-                                           value="<?= $p['valeur_min'] ?? '' ?>"
-                                           placeholder="Normal min">
+                                        name="valeur_min"
+                                        step="0.01"
+                                        class="form-input-drouot"
+                                        value="<?= $p['valeur_min'] ?? '' ?>"
+                                        placeholder="Normal min">
                                 </div>
                                 <div id="editMax_<?= $p['id'] ?>"
-                                     class="<?= $p['type']==='select' ? 'hidden' : '' ?>">
+                                    class="<?= $p['type']==='select' ? 'hidden' : '' ?>">
                                     <label class="form-label-drouot">
                                         Max
                                     </label>
                                     <input type="number"
-                                           name="valeur_max"
-                                           step="0.01"
-                                           class="form-input-drouot"
-                                           value="<?= $p['valeur_max'] ?? '' ?>"
-                                           placeholder="Normal max">
+                                        name="valeur_max"
+                                        step="0.01"
+                                        class="form-input-drouot"
+                                        value="<?= $p['valeur_max'] ?? '' ?>"
+                                        placeholder="Normal max">
                                 </div>
                                 <div id="editOpts_<?= $p['id'] ?>"
-                                     class="col-span-2
-                                     <?= $p['type']!=='select' ? 'hidden' : '' ?>">
+                                    class="col-span-2 <?= $p['type']!=='select' ? 'hidden' : '' ?>">
                                     <label class="form-label-drouot">
                                         Options (une par ligne)
                                     </label>
                                     <textarea name="valeurs_possibles"
-                                              class="form-input-drouot"
-                                              rows="3"><?php
-                                    if ($p['valeurs_possibles']) {
-                                        $opts = json_decode(
-                                            $p['valeurs_possibles'], true
-                                        ) ?? [];
-                                        echo htmlspecialchars(
-                                            implode("\n", $opts)
-                                        );
+                                            class="form-input-drouot"
+                                            rows="3"><?php
+                                    if (!empty($p['valeurs_possibles'])) {
+                                        $opts = is_array($p['valeurs_possibles']) 
+                                            ? $p['valeurs_possibles'] 
+                                            : json_decode($p['valeurs_possibles'], true) ?? [];
+                                        echo htmlspecialchars(implode("\n", $opts));
                                     }
                                     ?></textarea>
                                 </div>
                             </div>
+
                             <div class="d-flex gap-2 mt-2">
                                 <button type="submit"
                                         class="btn-success-drouot"
-                                        style="padding:6px 14px;
-                                        font-size:.82rem;">
+                                        style="padding:6px 14px; font-size:.82rem;">
                                     <i class="fas fa-floppy-disk"></i>
                                     Sauvegarder
                                 </button>
                                 <button type="button"
                                         onclick="cancelEdit(<?= $p['id'] ?>)"
                                         class="btn-outline-drouot"
-                                        style="padding:6px 14px;
-                                        font-size:.82rem;">
+                                        style="padding:6px 14px; font-size:.82rem;">
                                     Annuler
                                 </button>
                             </div>
@@ -320,7 +308,9 @@ include dirname(__DIR__) . '/../../views/layouts/header.php';
 
             <form method="POST"
                   action="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres/store"
-                  id="formParam">
+                  id="formParam"
+                  data-offline-store="parametres"
+                  data-redirect="<?= BASE_URL ?>admin/examens/<?= $examen['id'] ?>/parametres">
 
                 <div class="row g-2">
 

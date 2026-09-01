@@ -41,6 +41,7 @@ $roleOptions = [
     <div class="col-xl-8">
         <form method="POST"
               action="<?= BASE_URL ?>admin/users/store"
+              data-offline-store="users"
               id="formUser">
 
             <!-- Identité -->

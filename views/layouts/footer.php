@@ -72,9 +72,13 @@
 
         async function refreshPendingCount() {
             try {
-                pendingCount = (typeof OfflineOutbox !== 'undefined')
-                    ? await OfflineOutbox.count()
-                    : 0;
+                if (typeof LocalDB !== 'undefined' && LocalDB.count) {
+                    pendingCount = await LocalDB.count();
+                } else if (typeof OfflineOutbox !== 'undefined') {
+                    pendingCount = await OfflineOutbox.count();
+                } else {
+                    pendingCount = 0;
+                }
             } catch (err) {
                 pendingCount = 0;
             }

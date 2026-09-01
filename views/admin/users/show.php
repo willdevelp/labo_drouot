@@ -145,7 +145,9 @@ $initials = strtoupper(
             <div class="d-flex flex-column gap-2">
                 <!-- Toggle actif -->
                 <form method="POST"
-                      action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/toggle">
+                      action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/toggle"
+                      data-offline-store="users"
+                      data-entity-id="<?= $membre['id'] ?>">
                     <button type="submit"
                             class="<?= $membre['is_active']
                                 ? 'btn-warn-drouot'
@@ -166,7 +168,9 @@ $initials = strtoupper(
                 </form>
                 <!-- Supprimer -->
                 <form method="POST"
-                      action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/delete">
+                      action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/delete"
+                      data-offline-store="users"
+                      data-offline-delete-id="<?= $membre['id'] ?>">
                     <button type="submit"
                             class="btn-danger-drouot w-100
                                    justify-content-center"
@@ -238,6 +242,8 @@ $initials = strtoupper(
             </h6>
             <form method="POST"
                   action="<?= BASE_URL ?>admin/users/<?= $membre['id'] ?>/reset-password"
+                  data-offline-store="users"
+                  data-entity-id="<?= $membre['id'] ?>"
                   id="formReset">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-8">

@@ -156,7 +156,10 @@ a { color:inherit; }
         </span>
     </div>
 
-    <form method="POST" action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/assures/<?= $assure['id'] ?>/taux">
+    <form method="POST" 
+      action="<?= BASE_URL ?>assurance/portal/<?= $token ?>/assures/<?= $assure['id'] ?>/taux"
+      data-offline-store="assurances"
+      data-entity-id="<?= $assure['id'] ?>">
         <?php foreach ($examensGroupes as $categorie => $examens): ?>
         <h6 class="cat-title"><?= htmlspecialchars($categorie) ?></h6>
 

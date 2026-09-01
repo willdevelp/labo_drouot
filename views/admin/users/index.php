@@ -193,6 +193,8 @@ $roleLabels = [
                             ?>
                             <form method="POST"
                                   action="<?= BASE_URL ?>admin/users/<?= $u['id'] ?>/toggle"
+                                  data-offline-store="users"
+                                  data-entity-id="<?= $u['id'] ?>"
                                   style="display:inline;">
                                 <button type="submit"
                                         class="action-btn
