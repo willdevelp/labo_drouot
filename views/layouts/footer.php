@@ -36,20 +36,26 @@
 
     // ── Bannière de connectivité + file d'attente ─────────
     (function () {
-        var banner = document.getElementById('connectivity-banner');
-        var text   = document.getElementById('connectivity-banner-text');
+        var banner   = document.getElementById('connectivity-banner');
+        var text     = document.getElementById('connectivity-banner-text');
+        var actions  = document.getElementById('connectivity-banner-actions');
+        var btnSync  = document.getElementById('conn-btn-sync');
+        var btnClear = document.getElementById('conn-btn-clear');
         if (!banner) return;
 
         var wasOffline = false;
         var pendingCount = 0;
 
         function render() {
+            if (actions) actions.style.display = 'none';
+
             if (pendingCount > 0) {
                 banner.classList.remove('back-online');
                 banner.classList.add('show');
                 text.textContent = pendingCount +
                     ' élément(s) en attente de synchronisation' +
-                    (navigator.onLine ? ' — synchronisation en cours...' : ' — hors ligne.');
+                    (navigator.onLine ? ' — clique Réessayer ou Vider' : ' — hors ligne.');
+                if (actions) actions.style.display = 'inline-flex';
                 return;
             }
             if (!navigator.onLine) {
@@ -85,11 +91,49 @@
             render();
         }
 
-        window.addEventListener('online', function () { render(); });
+        if (btnSync) {
+            btnSync.addEventListener('click', async function () {
+                if (typeof LocalDB === 'undefined') return;
+                btnSync.disabled = true;
+                btnSync.textContent = '...';
+                try {
+                    var result = await LocalDB.syncAll(true);
+                    if (result.synced === 0 && result.failed > 0) {
+                        alert('Synchronisation échouée. Vérifie que tu es bien connecté, puis utilise « Vider » si l\'action a déjà été faite à la main.');
+                    }
+                } finally {
+                    btnSync.disabled = false;
+                    btnSync.textContent = 'Réessayer';
+                    refreshPendingCount();
+                }
+            });
+        }
+
+        if (btnClear) {
+            btnClear.addEventListener('click', async function () {
+                if (!confirm('Supprimer toutes les actions en attente ? Elles ne seront pas envoyées au serveur.')) return;
+                if (typeof LocalDB !== 'undefined' && LocalDB.clearOutbox) {
+                    await LocalDB.clearOutbox();
+                }
+                refreshPendingCount();
+            });
+        }
+
+        window.addEventListener('online', function () {
+            render();
+            if (typeof LocalDB !== 'undefined') {
+                setTimeout(function () { LocalDB.syncAll(false); }, 500);
+            }
+        });
         window.addEventListener('offline', function () { wasOffline = true; render(); });
         window.addEventListener('outbox:updated', refreshPendingCount);
 
         refreshPendingCount();
+
+        // Au chargement, si en ligne et file non vide → tenter une sync
+        if (navigator.onLine && typeof LocalDB !== 'undefined') {
+            setTimeout(function () { LocalDB.syncAll(false); }, 1200);
+        }
     })();
 </script>
 

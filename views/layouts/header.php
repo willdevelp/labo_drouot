@@ -548,12 +548,35 @@ $pageTitle = $pageTitles[$lastSeg] ?? 'Tableau de bord';
             background: var(--green-valid);
             color: #fff;
         }
+        #connectivity-banner .conn-actions {
+            display: inline-flex;
+            gap: 6px;
+            margin-left: 10px;
+        }
+        #connectivity-banner .conn-actions button {
+            border: none;
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            background: rgba(0,0,0,.12);
+            color: inherit;
+        }
+        #connectivity-banner .conn-actions button:hover {
+            background: rgba(0,0,0,.22);
+        }
     </style>
 </head>
 <body>
 <div id="connectivity-banner">
     <i class="fa-solid fa-wifi"></i>
     <span id="connectivity-banner-text">Hors ligne — certaines actions nécessitent une connexion.</span>
+    <span class="conn-actions" id="connectivity-banner-actions" style="display:none;">
+        <button type="button" id="conn-btn-sync" title="Relancer la synchronisation">Réessayer</button>
+        <button type="button" id="conn-btn-clear" title="Supprimer les actions en attente">Vider</button>
+    </span>
 </div>
 <div class="app-layout">
 
