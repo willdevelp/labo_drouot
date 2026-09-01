@@ -15,7 +15,7 @@
  *    déconnexion sur un poste partagé.
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE   = `labo-drouot-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `labo-drouot-pages-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `labo-drouot-runtime-${CACHE_VERSION}`;
@@ -194,11 +194,19 @@ async function syncOutboxFromSW() {
         try {
             if (item.fields && Array.isArray(item.fields)) {
                 const fd = new FormData();
-                item.fields.forEach(([k, v]) => fd.append(k, v));
-                await fetch(item.url, { method: 'POST', body: fd });
+                item.fields.forEach(([k, v]) => {
+                    if (v instanceof File && v.size === 0) return;
+                    fd.append(k, v);
+                });
+                await fetch(item.url, {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'include'
+                });
             } else if (item.payload) {
                 await fetch(item.url, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: item.action,

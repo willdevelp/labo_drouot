@@ -1,6 +1,9 @@
 /**
  * app-offline.js — Intercepteur unifié des formulaires et actions offline
  * S'appuie entièrement sur LocalDB.
+ *
+ * Règle : en ligne → soumission native (POST classique PHP).
+ *         hors ligne → enregistrement local + outbox + sync au retour réseau.
  */
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -12,6 +15,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const storeName = form.dataset.offlineStore;
         if (!storeName) return; // pas marqué offline → comportement natif
 
+        // ── EN LIGNE : on laisse le navigateur faire le POST classique ──
+        if (navigator.onLine) {
+            return;
+        }
+
+        // ── HORS LIGNE : on intercepte ─────────────────────────────────
         e.preventDefault();
 
         const deleteId    = form.dataset.offlineDeleteId;
@@ -37,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 const row = form.closest('tr') || form.closest('.card-item');
                 if (row) row.remove();
-                LocalDB.toast('Suppression enregistrée localement', 'info');
+                LocalDB.toast('Hors ligne : suppression enregistrée localement', 'info');
 
             } else if (toggleField && entityId) {
                 const toggleValue = parseInt(form.dataset.toggleValue, 10);
@@ -47,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     fields: Object.entries(togglePayload),
                     label: 'Mise à jour ' + storeName + ' #' + entityId
                 });
-                LocalDB.toast('Modification enregistrée localement', 'info');
+                LocalDB.toast('Hors ligne : modification enregistrée localement', 'info');
                 window.location.href = redirectUrl;
 
             } else if (entityId && entityId !== '') {
@@ -56,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     fields,
                     label: 'Modification ' + storeName + ' #' + entityId
                 });
-                LocalDB.toast('Modification enregistrée localement', 'info');
+                LocalDB.toast('Hors ligne : modification enregistrée localement', 'info');
                 window.location.href = redirectUrl;
 
             } else {
@@ -65,11 +74,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     fields,
                     label: 'Création ' + storeName
                 });
-                LocalDB.toast('Création enregistrée localement', 'info');
+                LocalDB.toast('Hors ligne : création enregistrée localement. Sync au retour du réseau.', 'info');
                 window.location.href = redirectUrl;
             }
-
-            LocalDB.syncAll();
 
         } catch (err) {
             console.error('Erreur traitement offline :', err);
@@ -81,6 +88,9 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-offline-delete]');
         if (!btn) return;
+
+        // En ligne : laisser le comportement natif (lien ou form submit)
+        if (navigator.onLine) return;
 
         e.preventDefault();
         if (!confirm('Confirmer la suppression ?')) return;
@@ -94,11 +104,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 type: storeName,
                 label: 'Suppression ' + storeName + ' #' + id
             });
-            LocalDB.syncAll();
 
             const row = btn.closest('tr') || btn.closest('.card-item');
             if (row) row.remove();
-            LocalDB.toast('Suppression enregistrée localement', 'info');
+            LocalDB.toast('Hors ligne : suppression enregistrée localement', 'info');
         } catch (err) {
             console.error('Erreur suppression locale :', err);
             LocalDB.toast('Erreur lors de la suppression locale', 'error');

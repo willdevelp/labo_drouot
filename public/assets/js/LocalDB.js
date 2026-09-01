@@ -170,6 +170,7 @@ const LocalDB = (function () {
 
     /**
      * Rejoue une entrée outbox (POST FormData prioritaire, sinon JSON).
+     * credentials: 'include' pour envoyer le cookie de session PHP.
      */
     async function syncOne(localId) {
         if (!navigator.onLine) {
@@ -188,15 +189,23 @@ const LocalDB = (function () {
 
         try {
             let response;
+            const fetchOpts = {
+                method: 'POST',
+                credentials: 'include',   // indispensable pour la session PHP
+                redirect: 'follow'
+            };
+
             if (item.fields && Array.isArray(item.fields)) {
                 const fd = new FormData();
                 item.fields.forEach(([k, v]) => {
+                    // Ignore les File vides (perdus après fermeture d'onglet)
+                    if (v instanceof File && v.size === 0) return;
                     fd.append(k, v);
                 });
-                response = await fetch(item.url, { method: 'POST', body: fd });
+                response = await fetch(item.url, { ...fetchOpts, body: fd });
             } else {
                 response = await fetch(item.url, {
-                    method: 'POST',
+                    ...fetchOpts,
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -209,11 +218,16 @@ const LocalDB = (function () {
                 });
             }
 
-            if (response.ok || response.redirected || (response.status >= 200 && response.status < 400)) {
+            // Succès : 2xx, ou redirection (PHP fait souvent header Location)
+            // Échec auth : souvent redirection vers /login
+            const finalUrl = response.url || '';
+            const isLoginRedirect = /\/login/i.test(finalUrl);
+
+            if (!isLoginRedirect && (response.ok || response.redirected || (response.status >= 200 && response.status < 400))) {
                 await deleteOutboxItem(item.localId);
                 return { ok: true, response };
             }
-            return { ok: false, error: 'http_' + response.status };
+            return { ok: false, error: isLoginRedirect ? 'auth' : ('http_' + response.status) };
         } catch (err) {
             return { ok: false, error: err.message || 'network' };
         }
@@ -500,6 +514,21 @@ const LocalDB = (function () {
         setTimeout(() => syncAll(false), 800);
     });
 
+    /** Vide toute la file d'attente (utile si des items sont bloqués) */
+    async function clearOutbox() {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('outbox', 'readwrite');
+            tx.objectStore('outbox').clear();
+            tx.oncomplete = () => {
+                window.dispatchEvent(new CustomEvent('outbox:updated'));
+                toast('File d\'attente vidée', 'info');
+                resolve();
+            };
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
     // ── API publique ───────────────────────────────────────────────────
     return {
         openDB,
@@ -514,6 +543,7 @@ const LocalDB = (function () {
         deleteOutboxItem,
         syncOne,
         syncAll,
+        clearOutbox,
         toast,
         bindForm,
         renderPendingWidget,
@@ -528,6 +558,7 @@ window.OfflineOutbox = {
     count:               ()     => LocalDB.count(),
     syncOne:             (id)   => LocalDB.syncOne(id),
     syncAll:             (f)    => LocalDB.syncAll(f),
+    clearOutbox:         ()     => LocalDB.clearOutbox(),
     toast:               (...a) => LocalDB.toast(...a),
     bindForm:            (...a) => LocalDB.bindForm(...a),
     renderPendingWidget: (...a) => LocalDB.renderPendingWidget(...a)
