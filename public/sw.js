@@ -15,7 +15,7 @@
  *    déconnexion sur un poste partagé.
  */
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const SHELL_CACHE   = `labo-drouot-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `labo-drouot-pages-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `labo-drouot-runtime-${CACHE_VERSION}`;

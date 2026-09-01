@@ -157,15 +157,28 @@ const LocalDB = (function () {
 
     async function deleteOutboxItem(localId) {
         const db = await openDB();
+        const key = normalizeOutboxKey(localId);
+        // Si clé invalide, on tente quand même la valeur brute (nettoyage)
+        const keysToTry = key !== null ? [key] : [localId];
         return new Promise((resolve, reject) => {
             const tx = db.transaction('outbox', 'readwrite');
-            tx.objectStore('outbox').delete(Number(localId));
+            const store = tx.objectStore('outbox');
+            keysToTry.forEach(k => {
+                try { store.delete(k); } catch (_) { /* ignore invalid key */ }
+            });
             tx.oncomplete = () => {
                 window.dispatchEvent(new CustomEvent('outbox:updated'));
                 resolve();
             };
             tx.onerror = () => reject(tx.error);
         });
+    }
+
+    /** Normalise une clé outbox (autoIncrement numérique). */
+    function normalizeOutboxKey(key) {
+        if (typeof key === 'number' && !Number.isNaN(key)) return key;
+        if (typeof key === 'string' && /^\d+$/.test(key)) return Number(key);
+        return null; // clé invalide (ex: "local_xxx")
     }
 
     /**
@@ -177,10 +190,17 @@ const LocalDB = (function () {
             return { ok: false, error: 'offline' };
         }
 
+        const key = normalizeOutboxKey(localId);
+        if (key === null) {
+            // Ancienne entrée corrompue : on la supprime pour ne pas bloquer la file
+            try { await deleteOutboxItem(localId); } catch (_) { /* ignore */ }
+            return { ok: false, error: 'invalid_key' };
+        }
+
         const db = await openDB();
         const item = await new Promise((resolve, reject) => {
             const tx  = db.transaction('outbox', 'readonly');
-            const req = tx.objectStore('outbox').get(Number(localId));
+            const req = tx.objectStore('outbox').get(key);
             req.onsuccess = () => resolve(req.result);
             req.onerror   = () => reject(req.error);
         });
@@ -191,14 +211,13 @@ const LocalDB = (function () {
             let response;
             const fetchOpts = {
                 method: 'POST',
-                credentials: 'include',   // indispensable pour la session PHP
+                credentials: 'include',
                 redirect: 'follow'
             };
 
             if (item.fields && Array.isArray(item.fields)) {
                 const fd = new FormData();
                 item.fields.forEach(([k, v]) => {
-                    // Ignore les File vides (perdus après fermeture d'onglet)
                     if (v instanceof File && v.size === 0) return;
                     fd.append(k, v);
                 });
@@ -218,13 +237,11 @@ const LocalDB = (function () {
                 });
             }
 
-            // Succès : 2xx, ou redirection (PHP fait souvent header Location)
-            // Échec auth : souvent redirection vers /login
             const finalUrl = response.url || '';
             const isLoginRedirect = /\/login/i.test(finalUrl);
 
             if (!isLoginRedirect && (response.ok || response.redirected || (response.status >= 200 && response.status < 400))) {
-                await deleteOutboxItem(item.localId);
+                await deleteOutboxItem(key);
                 return { ok: true, response };
             }
             return { ok: false, error: isLoginRedirect ? 'auth' : ('http_' + response.status) };
@@ -241,13 +258,15 @@ const LocalDB = (function () {
 
         const items = (await getAllOutbox())
             .filter(i => force || !i.manualOnly)
-            .sort((a, b) => a.createdAt - b.createdAt);
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
         let synced = 0;
         let failed = 0;
 
         for (const item of items) {
-            const result = await syncOne(item.localId);
+            // localId peut être absent sur d'anciennes entrées : utiliser la clé IDB
+            const key = item.localId != null ? item.localId : item.id;
+            const result = await syncOne(key);
             if (result.ok) {
                 synced++;
             } else {
@@ -309,17 +328,19 @@ const LocalDB = (function () {
 
         const tx = db.transaction([storeName, 'outbox'], 'readwrite');
         tx.objectStore(storeName).add(item);
+        // Ne PAS fixer localId ici : c'est la clé autoIncrement de l'outbox.
+        // L'id métier temporaire est conservé dans entityLocalId / payload.
         tx.objectStore('outbox').add({
-            action:     'CREATE',
+            action:         'CREATE',
             storeName,
-            url:        serverUrl,
-            localId:    item.id,
-            type:       options.type || storeName,
-            label:      options.label || ('Création ' + storeName),
+            url:            serverUrl,
+            entityLocalId:  item.id,
+            type:           options.type || storeName,
+            label:          options.label || ('Création ' + storeName),
             fields,
-            payload:    data,
-            manualOnly: !!options.manualOnly,
-            createdAt:  Date.now()
+            payload:        data,
+            manualOnly:     !!options.manualOnly,
+            createdAt:      Date.now()
         });
 
         await txDone(tx);
